@@ -1,0 +1,12 @@
+﻿1. TextGraphics. Support right to left fonts.
+2. Create image editor.
+3. DDS, ICO, CUR (Add).
+4. Text drawing. Look for primitives in other projects.
+5. Palette. Color cluster management.
+6. Is it possible to make image, that just reffers to parts of other images?
+7. BitmapTools error managment in WindowProc.
+8. Make sure unsupported file formats don't cause hard to spot errors, when loading.
+9. Support none 8-bit color components.
+10. Global tasks.
+11. Switching to image window should not trigger event processing, that action that caused switching would normaly cause.
+12. Fix problems marked by !!! and ???.

@@ -1,0 +1,8 @@
+*.layout
+*.depend
+*.cscope_file_list
+Release
+Debug
+gmon.out
+output
+-tasks
