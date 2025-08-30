@@ -1,0 +1,4 @@
+﻿Don't build with -flto
+Don't build with -pg
+Libs present in exe, that will use it are not needed.
+Compiler flags making linking static, might be not needed, if they are present in exe, that will use this.
