@@ -279,7 +279,6 @@ void Test_23_Translate( Context &context )
                     get( file, false );
 
                 sId = 0;
-                volume = -1;
                 redraw();
             }
         }
