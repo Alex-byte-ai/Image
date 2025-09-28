@@ -183,6 +183,8 @@
 		<Unit filename="../Utilities/Image/Data.h" />
 		<Unit filename="../Utilities/Image/Format.cpp" />
 		<Unit filename="../Utilities/Image/Format.h" />
+		<Unit filename="../Utilities/Image/JPG.cpp" />
+		<Unit filename="../Utilities/Image/JPG.h" />
 		<Unit filename="../Utilities/Image/PNG.cpp" />
 		<Unit filename="../Utilities/Image/PNG.h" />
 		<Unit filename="../Utilities/Image/PixelIO.cpp" />

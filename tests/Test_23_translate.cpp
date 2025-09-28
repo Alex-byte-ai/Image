@@ -22,26 +22,70 @@ void Test_23_Translate( Context &context )
     bool showImages = info( L"showImages" ).as<bool>();
     bool inputVariableData = info( L"inputVariableData" ).as<bool>();
     bool outputVariableData = info( L"outputVariableData" ).as<bool>();
-    // ???
 
     if( !readDisk )
         return;
 
     ImageData image;
 
-    std::vector<std::vector<uint8_t>> samples;
-
-    auto get = [&samples]( const std::filesystem::path & path )
+    struct Image
     {
-        std::ifstream file( path, std::ios::binary );
+        const std::filesystem::path& path;
+        std::vector<uint8_t> content;
 
-        file.seekg( 0, std::ios::end );
-        auto size = ( size_t )file.tellg();
-        file.seekg( 0, std::ios::beg );
+        Image( const std::filesystem::path& p, std::vector<uint8_t>&& c ) : path( p ), content( c )
+        {}
+    };
+    std::map<std::filesystem::path, size_t> index;
+    std::vector<Image> samples;
+    size_t volume = 0;
 
-        auto &sample = samples.emplace_back();
-        sample.resize( size );
-        makeException( file.read( ( char * )sample.data(), size ) );
+    auto get = [&]( std::filesystem::path path, bool load = true )
+    {
+        std::vector<uint8_t> content;
+        if( load )
+        {
+            std::ifstream file( path, std::ios::binary );
+
+            file.seekg( 0, std::ios::end );
+            auto size = ( size_t )file.tellg();
+            file.seekg( 0, std::ios::beg );
+
+            volume += size;
+
+            content.resize( size );
+            makeException( file.read( ( char * )content.data(), size ) );
+        }
+
+        auto i = index.find( path );
+        if( i == index.end() )
+        {
+            auto& p = index.emplace( std::move( path ), samples.size() ).first->first;
+            samples.emplace_back( p, std::move( content ) );
+        }
+        else
+        {
+            samples[i->second].content = std::move( content );
+        }
+    };
+
+    auto unload = [&]()
+    {
+        if( volume <= 100000 )
+            return false;
+
+        volume = 0;
+        for( auto& sample : samples )
+            sample.content.clear();
+
+        return true;
+    };
+
+    auto erase = [&]()
+    {
+        samples.clear();
+        index.clear();
+        volume = 0;
     };
 
     get( L"input/abstract_space.bmp" );
@@ -67,20 +111,20 @@ void Test_23_Translate( Context &context )
 
     std::vector<double> scales{0.33, 0.4, 0.5, 0.75, 1.0, 1.5, 2.0};
     size_t sId = 0, wId = 3, hId = 3, scount = scales.size() * 2;
-    std::vector<std::filesystem::path> customSamples;
-    bool scale = true, folder = false;
     int width = 128, height = 128;
+    bool scale = true;
 
     auto redrawBase = [&]()
     {
-        if( folder )
-        {
-            samples.clear();
-            get( customSamples[sId] );
-        }
+        auto& sample = samples[sId];
+        auto& content = sample.content;
 
-        input.link = samples[folder ? 0 : sId].data();
-        input.bytes = samples[folder ? 0 : sId].size();
+        unload();
+        if( content.empty() )
+            get( sample.path );
+
+        input.link = content.data();
+        input.bytes = content.size();
 
         output.w = Round( width * ( wId < scales.size() ? scales[wId] : -scales[scount - wId - 1] ) );
         output.h = Round( height * ( hId < scales.size() ? scales[hId] : -scales[scount - hId - 1] ) );
@@ -107,41 +151,31 @@ void Test_23_Translate( Context &context )
         try
         {
             translate( input, output, scale );
-            if( folder )
-                text << L"Currently displaying: " << customSamples[sId].native() << L"\n";
+            text << L"Currently displaying: " << samples[sId].path.native() << L"\n";
         }
         catch( const Exception &e )
         {
             generateErrorImage( Pixel( 0, 255, 0 ) );
-            if( folder )
-            {
-                text << L"Can't display: " << customSamples[sId].native() << L"\n";
-                ++text;
-                text << L"Error: " << e.message() << L"\n";
-                --text;
-            }
+            text << L"Can't display: " << samples[sId].path.native() << L"\n";
+            ++text;
+            text << L"Error: " << e.message() << L"\n";
+            --text;
         }
         catch( const std::exception &e )
         {
             generateErrorImage( Pixel( 255, 0, 0 ) );
-            if( folder )
-            {
-                text << L"Can't display: " << customSamples[sId].native() << L"\n";
-                ++text;
-                text << L"Error: " << e.what() << L"\n";
-                --text;
-            }
+            text << L"Can't display: " << samples[sId].path.native() << L"\n";
+            ++text;
+            text << L"Error: " << e.what() << L"\n";
+            --text;
         }
         catch( ... )
         {
             generateErrorImage( Pixel( 255, 0, 255 ) );
-            if( folder )
-            {
-                text << L"Can't display: " << customSamples[sId].native() << L"\n";
-                ++text;
-                text << L"Unknown error.\n";
-                --text;
-            }
+            text << L"Can't display: " << samples[sId].path.native() << L"\n";
+            ++text;
+            text << L"Unknown error.\n";
+            --text;
         }
     };
 
@@ -185,19 +219,13 @@ void Test_23_Translate( Context &context )
 
         if( keyDown( 'E' ) )
         {
-            if( folder )
-                sId = ( sId + 1 ) % customSamples.size();
-            else
-                sId = ( sId + 1 ) % samples.size();
+            sId = ( sId + 1 ) % samples.size();
             redraw();
         }
 
         if( keyDown( 'Q' ) )
         {
-            if( folder )
-                sId = ( sId + customSamples.size() - 1 ) % customSamples.size();
-            else
-                sId = ( sId + samples.size() - 1 ) % samples.size();
+            sId = ( sId + samples.size() - 1 ) % samples.size();
             redraw();
         }
 
@@ -206,36 +234,57 @@ void Test_23_Translate( Context &context )
             redraw();
         }
 
-        if( inputVariableData && !folder && keyDown( 'L' ) )
+        if( sId == 0 && keyDown( 'C' ) )
         {
-            auto path = OpenPath();
-            if( path )
+            sId = 0;
+            do
             {
-                get( *path );
-                customSamples.push_back( *path );
-            }
-        }
-
-        if( folder && sId == 0 && keyDown( 'C' ) )
-        {
-            sId = 1;
-            while( sId < customSamples.size() )
-            {
-                redrawBase();
                 ++sId;
+                redraw();
             }
-            sId = customSamples.size() - 1;
+            while( sId + 1 < samples.size() );
         }
 
         if( keyDown( 'B' ) )
         {
             scale = !scale;
             redraw();
-            width = output.w;
-            height = output.h;
         }
 
-        if( writeDisk && outputVariableData && keyDown( 'K' ) )
+        if( inputVariableData && keyDown( 'L' ) )
+        {
+            auto p = OpenPath();
+            if( p )
+            {
+                std::set<std::filesystem::path> folders;
+                /*
+                for( const auto &sample : samples )
+                    folders.insert( sample.path.parent_path() );
+                */
+                folders.insert( p->parent_path() );
+
+                std::set<std::filesystem::path> files;
+                for( const auto &path : folders )
+                {
+                    for( const auto &file : std::filesystem::recursive_directory_iterator( path ) )
+                    {
+                        std::filesystem::path f = file;
+                        if( f.extension() == L".bmp" || f.extension() == L".rle" || f.extension() == L".dib" || f.extension() == L".jpg" || f.extension() == L".jpeg" || f.extension() == L".png" )
+                            files.emplace( std::move( f ) );
+                    }
+                }
+
+                erase();
+                for( auto &file : files )
+                    get( file, false );
+
+                sId = 0;
+                volume = -1;
+                redraw();
+            }
+        }
+
+        if( writeDisk && outputVariableData && keyDown( 'F' ) && *inputData.keys.letter( 'S' ) )
         {
             auto path = SavePath();
             if( path )
@@ -266,36 +315,5 @@ void Test_23_Translate( Context &context )
         redrawBase();
         ImageWindow window( image, resize );
         window.run();
-    }
-
-    if( !customSamples.empty() )
-    {
-        std::set<std::filesystem::path> folders;
-        for( const auto &customSample : customSamples )
-            folders.insert( customSample.parent_path() );
-
-        std::set<std::filesystem::path> files;
-        for( const auto &path : folders )
-        {
-            for( const auto &file : std::filesystem::recursive_directory_iterator( path ) )
-            {
-                std::filesystem::path f = file;
-                if( f.extension() == L".png" || f.extension() == L".bmp" || f.extension() == L".rle" || f.extension() == L".dib" )
-                    files.emplace( std::move( f ) );
-            }
-        }
-
-        customSamples.clear();
-        for( auto &file : files )
-            customSamples.emplace_back( std::move( file ) );
-
-        sId = 0;
-        folder = true;
-        if( showImages )
-        {
-            redrawBase();
-            ImageWindow window( image, resize );
-            window.run();
-        }
     }
 }
