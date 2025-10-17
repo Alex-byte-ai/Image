@@ -148,6 +148,7 @@ void Canvas::draw( const Quadrangle &q, const Color &c )
             p.a[0] = Vector2D( j, i + 1 );
 
             double area = Quadrangle::commonArea( p, q );
+
             if( area >= 0 )
                 operator()( j, i ).draw( c, area );
             else

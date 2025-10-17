@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <functional>
 #include <optional>
@@ -9,6 +9,7 @@
 #include "Window.h"
 
 #include "ImageDataBase.h"
+#include "JustEdit.h"
 
 class ImageWindow
 {
@@ -40,16 +41,12 @@ public:
         }
     };
 
-    class InputData;
-    class OutputData;
-
-    using HandleMsg = std::function<void( const InputData &, OutputData & )>;
-
     class InputData
     {
     public:
         ChangedValue<bool> escape, shift, space, enter, leftMouse, rightMouse, middleMouse, f1;
         ChangedValue<int> mouseX{ -1 }, mouseY{ -1 };
+        bool init;
         Keys keys;
     };
 
@@ -65,6 +62,8 @@ public:
         {}
     };
 
+    using HandleMsg = std::function<void( const InputData &, OutputData & )>;
+
     class Data
     {
     public:
@@ -77,7 +76,7 @@ public:
         {}
     };
 
-    ImageWindow( ImageDataBase &image, HandleMsg handleMsg, Data initData = Data() );
+    ImageWindow( ImageDataBase &image, HandleMsg handleMsg, JustEdit::Entity* root = nullptr, Data initData = Data() );
     ~ImageWindow();
 
     void run();
@@ -85,13 +84,15 @@ private:
     void inputReset();
     void inputRelease();
 
-    class WindowData;
-    WindowData *windowData;
+    class Implementation;
+    Implementation *implementation;
 
     InputData inputData;
     OutputData outputData;
 
+    JustEdit::Entity* root;
     HandleMsg handleMsg;
+
     ImageDataBase &image;
     Data data;
 

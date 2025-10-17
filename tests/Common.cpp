@@ -1,4 +1,4 @@
-﻿#include "Common.h"
+#include "Common.h"
 
 #include "../Palette.h"
 #include "../CheckProgress.h"

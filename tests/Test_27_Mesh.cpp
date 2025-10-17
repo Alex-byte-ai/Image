@@ -32,7 +32,7 @@ void Test_27_Mesh( Context &context )
 
     image.reset( 256, 256, Pixel( 0, 0, 0, 0 ) );
 
-    Mesh mesh, original, cube, cubeObj, field;
+    Mesh mesh, original, cube, cubeObj, field, prism;
 
     {
         Affine3D pos =
@@ -67,6 +67,22 @@ void Test_27_Mesh( Context &context )
             Affine3D( Matrix3D::Scale( 0.5 ) ) *
             Affine3D( Vector3D( -0.5, -0.5, 0 ) );
         field.transform( pos );
+    }
+
+    {
+        std::vector<Vector2D> base
+        {
+            {0.0, 0.0},
+            {4.0, 0.0},
+            {4.0, 4.0},
+            {3.0, 4.0},
+            {3.0, 1.0},
+            {1.0, 1.0},
+            {1.0, 4.0},
+            {0.0, 4.0}
+        };
+
+        prism.prism( base );
     }
 
     Vector3D light( 3, -3, -3 );
@@ -194,5 +210,15 @@ void Test_27_Mesh( Context &context )
         window.run();
         if( outputVariableData )
             image.output( context.Output() / L"field.png" );
+    }
+
+    mesh = original = prism;
+    draw( image );
+    if( showImages )
+    {
+        ImageWindow window( image, scene );
+        window.run();
+        if( outputVariableData )
+            image.output( context.Output() / L"prism.png" );
     }
 }

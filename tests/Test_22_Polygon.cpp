@@ -260,40 +260,46 @@ static void experiment0( ConsoleOutput &text, Context &, bool, bool showImages )
     ImageData image;
     image.reset( 512, 512, Pixel( 0, 0, 0 ) );
 
-    ComplexPolygon polygon0( Vector2D( -0.25, -0.25 ), Vector2D( -0.25, 0.25 ), Vector2D( 0.25, 0.25 ) ), polygon1;
+    std::optional<ComplexPolygon> polygon0, polygon1, polygon2;
     std::vector<Vector2D> points;
     int id = 0;
+
+    polygon0.emplace( Vector2D( -0.25, -0.25 ), Vector2D( -0.25, 0.25 ), Vector2D( 0.25, 0.25 ) );
 
     auto draw = [&]( const ImageWindow::InputData & inputData, ImageWindow::OutputData & outputData )
     {
         auto update = [&]()
         {
-            CheckProgress timer( nullptr, 1000 );
-
-            ComplexPolygon polygon2;
-            polygon2 = polygon0 && polygon1;
-
-            // polygon0 = ComplexPolygon( Vector2D( -0.25, -0.25 ), Vector2D( 0.25, 0.25 ), Vector2D( -0.25, 0.25 ) );
-
-            outputData.image.get().function( image, [&]( double x, double y, const Color &, Color & output )
+            try
             {
-                bool f;
-                Vector2D point( x, y );
-                if( id == 0 )
+                CheckProgress timer( nullptr, 1000 );
+
+                if( ( id == 1 || id == 2 ) && polygon0 && polygon1 )
+                    polygon2.emplace( *polygon0 && *polygon1 );
+
+                outputData.image.get().function( image, [&]( double x, double y, const Color &, Color & output )
                 {
-                    f = polygon0.carcass( point ) || polygon1.carcass( point );
-                }
-                else if( id == 1 )
-                {
-                    f = polygon2.inside( point );
-                }
-                else if( id == 2 )
-                {
-                    f = polygon2.carcass( point );
-                }
-                output = f ? Color( 1, 1, 1 ) : Color( 0, 0, 0 );
-            } );
-            text << L"experiment0 time: " << timer.check() << L"\n";
+                    Vector2D point( x, y );
+
+                    bool f = false;
+                    if( id == 0 && polygon0 && polygon1 )
+                    {
+                        f = polygon0->carcass( point ) || polygon1->carcass( point );
+                    }
+                    else if( id == 1 && polygon2 )
+                    {
+                        f = polygon2->inside( point );
+                    }
+                    else if( id == 2 && polygon2 )
+                    {
+                        f = polygon2->carcass( point );
+                    }
+                    output = f ? Color( 1, 1, 1 ) : Color( 0, 0, 0 );
+                } );
+                text << L"experiment0 time: " << timer.check() << L"\n";
+            }
+            catch( ... )
+            {}
         };
 
         auto &leftMouse = inputData.leftMouse;
@@ -304,7 +310,7 @@ static void experiment0( ConsoleOutput &text, Context &, bool, bool showImages )
             points.emplace_back( mouseX, mouseY );
             if( points.size() == 3 )
             {
-                polygon1 = ComplexPolygon( points[0], points[1], points[2] );
+                polygon1.emplace( points[0], points[1], points[2] );
                 points.clear();
             }
             update();

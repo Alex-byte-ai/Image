@@ -1,9 +1,8 @@
-﻿#include "ImageWindow.h"
+#include "ImageWindow.h"
 
 #include <windowsx.h>
 #include <windows.h>
 
-#include "RandomString.h"
 #include "Exception.h"
 #include "Lambda.h"
 #include "Basic.h"
@@ -468,24 +467,25 @@ public:
     {}
 };
 
-class ImageWindow::WindowData
+class ImageWindow::Implementation
 {
 public:
     GraphicInterface::Description g;
     std::wstring className, name;
     ImageWindow *window;
     ATOM windowClass;
+    HWND hwnd;
 
-    WindowData( WNDPROC windowProc, ImageWindow *w )
+    Implementation( WNDPROC windowProc, ImageWindow *w )
         : g( 24, 16, 24, 8, 1 ), window( w )
     {
-        static RandomNumber randomNumber;
-        RandomWString( randomNumber, L"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", className, 16, true );
+        static long long unsigned index = 0;
+        className = L"ImageWindowWinApiImplementation" + std::to_wstring( index++ );
 
-        name = L"Canvas";
+        name = w->root ? L"JustEdit" : L"Canvas";
 
         WNDCLASSEXW wc;
-        memset( &wc, 0, sizeof( wc ) );
+        clear( &wc, sizeof( wc ) );
         wc.cbSize = sizeof( wc );
         wc.style = CS_HREDRAW | CS_VREDRAW;
         wc.lpfnWndProc = windowProc;
@@ -497,6 +497,8 @@ public:
 
         windowClass = RegisterClassExW( &wc );
         makeException( windowClass );
+
+        hwnd = nullptr;
 
         if( !window->defaultSettings )
         {
@@ -584,7 +586,7 @@ public:
         }
     }
 
-    ~WindowData()
+    ~Implementation()
     {
         g.window.x = *window->data.x;
         g.window.y = *window->data.y;
@@ -606,36 +608,36 @@ public:
 
 std::unique_ptr<ImageWindow::DefaultSettings> ImageWindow::defaultSettings;
 
-ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data initData )
-    : outputData( image_ ), handleMsg( handleMsg_ ), image( image_ ), data( initData )
+ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, JustEdit::Entity* root_, Data initData )
+    : outputData( image_ ), root( root_ ), handleMsg( handleMsg_ ), image( image_ ), data( initData )
 {
-    windowData = nullptr;
+    implementation = nullptr;
     if( image.empty() )
         return;
 
-    // This code is positioned in lambda to accesses private members of Window
+    // This code is positioned in lambda to accesses private members of ImageWindow
     auto windowProc = []( HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam ) -> LRESULT
     {
-        auto d = ( WindowData * )GetWindowLongPtr( hwnd, GWLP_USERDATA );
+        auto impl = ( Implementation * )GetWindowLongPtr( hwnd, GWLP_USERDATA );
 
-        auto inputReset = [d]()
+        auto inputReset = [&impl]()
         {
-            if( d )
-                d->window->inputReset();
+            if( impl )
+                impl->window->inputReset();
         };
 
-        auto inputRelease = [d]()
+        auto inputRelease = [&impl]()
         {
-            if( d )
-                d->window->inputRelease();
+            if( impl )
+                impl->window->inputRelease();
         };
 
-        auto quit = [&]()
+        auto quit = [hwnd]()
         {
             DestroyWindow( hwnd );
         };
 
-        auto getPos = [&]( int &x, int &y )
+        auto getPos = [hwnd]( int &x, int &y )
         {
             POINT point;
             GetCursorPos( &point );
@@ -647,15 +649,136 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
             y = point.y - rect.top;
         };
 
+        auto justEditMsg = [hwnd]( const InputData & inputData, OutputData & outputData )
+        {
+            static Affine2D shift;
+            static JustEdit::Entity *selection = nullptr;
+
+            auto impl = ( Implementation* )GetWindowLongPtr( hwnd, GWLP_USERDATA );
+            if( !impl )
+                return false;
+
+            auto& root = impl->window->root;
+
+            auto update = [&]()
+            {
+                Vector2D topLeft, bottomRight;
+                if( root->size( Affine2D( Vector2D() ), topLeft, bottomRight ) )
+                {
+                    auto w = RoundUp( bottomRight.x - topLeft.x );
+                    auto h = RoundUp( bottomRight.y - topLeft.y );
+                    outputData.image.get().reset( w, h );
+
+                    shift = Affine2D( topLeft ).inv();
+                    root->draw( shift, outputData.image.get() );
+                }
+            };
+
+            auto keyDown = [&]( char symbol )
+            {
+                auto &key = inputData.keys.letter( symbol );
+                return key.changed() && *key;
+            };
+
+            if( inputData.init )
+                update();
+
+            if( selection && keyDown( 'W' ) )
+            {
+                root = selection;
+                selection = nullptr;
+                update();
+            }
+
+            if( keyDown( 'S' ) )
+            {
+                auto parent = root->getParent();
+                if( parent )
+                {
+                    selection = root = parent;
+                    update();
+                }
+            }
+
+            if( selection && keyDown( 'M' ) )
+            {
+                Settings::Parameters parameters;
+
+                auto apply = [&]( std::wstring & )
+                {
+                    for( auto& p : parameters )
+                        p.apply();
+
+                    update();
+                    return true;
+                };
+
+                parameters =
+                {
+                    {L"Apply", {}, {}, apply},
+                };
+
+                for( auto&& [name, value] : selection->data() )
+                {
+                    parameters.emplace_back( name, value );
+                }
+
+                Settings test( selection->description(), parameters );
+                test.run();
+            }
+
+            bool lmb = inputData.leftMouse.changed() && *inputData.leftMouse;
+            bool rmb = inputData.rightMouse.changed() && *inputData.rightMouse;
+
+            if( lmb || rmb )
+            {
+                Vector2D point( *inputData.mouseX, *inputData.mouseY );
+                selection = root->pointsTo( shift, point, JustEdit::SelectionMode::Part );
+                if( rmb )
+                {
+                    auto make = []( std::wstring msg )
+                    {
+                        return [msg]()
+                        {
+                            Popup( Popup::Type::Info, L"Menu", msg ).run();
+                        };
+                    };
+
+                    ContextMenu menu(
+                    {
+                        {L"Open", true, make( L"Open" )},
+                        {L"Save", false, make( L"Save" )},
+                        {
+                            L"More...", true, make( L"More..." ),
+                            {
+                                {L"Sub Item 1", true, make( L"Sub Item 1" )},
+                                {L"Sub Item 2", false, make( L"Sub Item 1" )}
+                            }
+                        },
+                        {L"Exit", true, make( L"Exit" )}
+                    } );
+                    menu.run();
+                }
+            }
+
+            return false;
+        };
+
         auto handle = [&]()
         {
-            if( !d || !d->window )
+            if( !impl || !impl->window )
                 return;
 
             try
             {
-                if( d->window->handleMsg )
-                    d->window->handleMsg( d->window->inputData, d->window->outputData );
+                if( impl->window->handleMsg )
+                {
+                    impl->window->handleMsg( impl->window->inputData, impl->window->outputData );
+                }
+                else if( impl->window->root )
+                {
+                    justEditMsg( impl->window->inputData, impl->window->outputData );
+                }
             }
             catch( ... )
             {
@@ -665,37 +788,43 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
 
             inputReset();
 
-            auto &img = d->window->outputData.image;
+            auto &img = impl->window->outputData.image;
             if( img.changed() )
             {
                 int x = 0, y = 0;
-                d->g.content.prepare( ( *img )( 0, 0 ), img->s(), img->h() );
-                updateWindowContent( d->g, hwnd, x, y );
+                impl->g.content.prepare( ( *img )( 0, 0 ), img->s(), img->h() );
+                updateWindowContent( impl->g, hwnd, x, y );
                 img.reset();
             }
 
-            auto &popup = d->window->outputData.popup;
+            auto &popup = impl->window->outputData.popup;
             if( popup.changed() )
             {
                 popup.get().run();
                 popup.reset();
             }
 
-            if( d->window->outputData.quit )
+            if( impl->window->outputData.quit )
             {
                 quit();
             }
+
+            impl->window->inputData.init = false;
         };
 
         switch( message )
         {
-        case WM_NCCREATE:
         case WM_CREATE:
-            SetWindowLongPtr( hwnd, GWLP_USERDATA, ( LONG_PTR )( ( LPCREATESTRUCT )lParam )->lpCreateParams );
+            impl = ( Implementation * )( ( LPCREATESTRUCT )lParam )->lpCreateParams;
+            SetWindowLongPtr( hwnd, GWLP_USERDATA, ( LONG_PTR )impl );
+            impl->window->inputData.init = true;
+            handle();
             break;
         case WM_DESTROY:
-            SetWindowLongPtr( hwnd, GWLP_USERDATA, 0 );
-            PostQuitMessage( 0 );
+            impl->hwnd = nullptr;
+            impl = nullptr;
+            SetWindowLongPtr( hwnd, GWLP_USERDATA, ( LONG_PTR )impl );
+            // PostQuitMessage( 0 );
             return 0;
         case WM_APP:
             break;
@@ -706,10 +835,10 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
                 int x = LOWORD( lParam ) - rect.left;
                 int y = HIWORD( lParam ) - rect.top;
 
-                bool left   = d->g.leftTrigger.inside( x, y );
-                bool right  = d->g.rightTrigger.inside( x, y );
-                bool top    = d->g.topTrigger.inside( x, y );
-                bool bottom = d->g.bottomTrigger.inside( x, y );
+                bool left   = impl->g.leftTrigger.inside( x, y );
+                bool right  = impl->g.rightTrigger.inside( x, y );
+                bool top    = impl->g.topTrigger.inside( x, y );
+                bool bottom = impl->g.bottomTrigger.inside( x, y );
 
                 if( top && left ) return HTTOPLEFT;
                 if( top && right ) return HTTOPRIGHT;
@@ -721,21 +850,21 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
                 if( top ) return HTTOP;
                 if( bottom ) return HTBOTTOM;
 
-                if( d->g.closeButton.inside( x, y ) || d->g.minimizeButton.inside( x, y ) || d->g.maximizeButton.inside( x, y ) )
+                if( impl->g.closeButton.inside( x, y ) || impl->g.minimizeButton.inside( x, y ) || impl->g.maximizeButton.inside( x, y ) )
                     return HTCLIENT;
 
-                if( d->g.title.inside( x, y ) )
+                if( impl->g.title.inside( x, y ) )
                     return HTCAPTION;
 
                 return HTCLIENT;
             }
         case WM_GETMINMAXINFO:
             {
-                if( d )
+                if( impl )
                 {
                     MINMAXINFO *p = ( MINMAXINFO * )lParam;
-                    p->ptMinTrackSize.x = d->g.getMinX();
-                    p->ptMinTrackSize.y = d->g.getMinY();
+                    p->ptMinTrackSize.x = impl->g.getMinX();
+                    p->ptMinTrackSize.y = impl->g.getMinY();
                     return 0;
                 }
             }
@@ -754,15 +883,15 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
             break;
         case WM_SIZE:
             {
-                updateWindowContent( d->g, hwnd, 0, 0 );
+                updateWindowContent( impl->g, hwnd, 0, 0 );
                 break;
             }
         case WM_MOVE:
             {
                 RECT rect;
                 GetWindowRect( hwnd, &rect );
-                d->window->data.x = rect.left;
-                d->window->data.y = rect.top;
+                impl->window->data.x = rect.left;
+                impl->window->data.y = rect.top;
                 break;
             }
         case WM_PAINT:
@@ -772,11 +901,11 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
             {
                 int x, y;
                 getPos( x, y );
-                updateWindowContent( d->g, hwnd, x, y );
-                if( d->g.content.inside( x, y ) )
+                updateWindowContent( impl->g, hwnd, x, y );
+                if( impl->g.content.inside( x, y ) )
                 {
-                    d->window->inputData.mouseX = x - d->g.content.x;
-                    d->window->inputData.mouseY = y - d->g.content.y;
+                    impl->window->inputData.mouseX = x - impl->g.content.x;
+                    impl->window->inputData.mouseY = y - impl->g.content.y;
                     handle();
                 }
                 return 0;
@@ -785,9 +914,9 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
             {
                 int x, y;
                 getPos( x, y );
-                if( d->g.content.inside( x, y ) )
+                if( impl->g.content.inside( x, y ) )
                 {
-                    d->window->inputData.leftMouse = true;
+                    impl->window->inputData.leftMouse = true;
                     handle();
                 }
             }
@@ -797,13 +926,13 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
                 int x, y;
                 getPos( x, y );
 
-                if( d->g.closeButton.inside( x, y ) )
+                if( impl->g.closeButton.inside( x, y ) )
                 {
                     quit();
                     return 0;
                 }
 
-                if( d->g.maximizeButton.inside( x, y ) )
+                if( impl->g.maximizeButton.inside( x, y ) )
                 {
                     if( IsZoomed( hwnd ) )
                         ShowWindow( hwnd, SW_RESTORE );
@@ -812,15 +941,15 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
                     return 0;
                 }
 
-                if( d->g.minimizeButton.inside( x, y ) )
+                if( impl->g.minimizeButton.inside( x, y ) )
                 {
                     ShowWindow( hwnd, SW_MINIMIZE );
                     return 0;
                 }
 
-                if( d->g.content.inside( x, y ) )
+                if( impl->g.content.inside( x, y ) )
                 {
-                    d->window->inputData.leftMouse = false;
+                    impl->window->inputData.leftMouse = false;
                     handle();
                 }
                 return 0;
@@ -829,9 +958,9 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
             {
                 int x, y;
                 getPos( x, y );
-                if( d->g.content.inside( x, y ) )
+                if( impl->g.content.inside( x, y ) )
                 {
-                    d->window->inputData.rightMouse = true;
+                    impl->window->inputData.rightMouse = true;
                     handle();
                 }
             }
@@ -840,9 +969,9 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
             {
                 int x, y;
                 getPos( x, y );
-                if( d->g.content.inside( x, y ) )
+                if( impl->g.content.inside( x, y ) )
                 {
-                    d->window->inputData.rightMouse = false;
+                    impl->window->inputData.rightMouse = false;
                     handle();
                 }
             }
@@ -851,9 +980,9 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
             {
                 int x, y;
                 getPos( x, y );
-                if( d->g.content.inside( x, y ) )
+                if( impl->g.content.inside( x, y ) )
                 {
-                    d->window->inputData.middleMouse = true;
+                    impl->window->inputData.middleMouse = true;
                     handle();
                 }
             }
@@ -862,9 +991,9 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
             {
                 int x, y;
                 getPos( x, y );
-                if( d->g.content.inside( x, y ) )
+                if( impl->g.content.inside( x, y ) )
                 {
-                    d->window->inputData.middleMouse = false;
+                    impl->window->inputData.middleMouse = false;
                     handle();
                 }
             }
@@ -885,7 +1014,7 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
 
         if( pressed || released )
         {
-            auto &input = d->window->inputData;
+            auto &input = impl->window->inputData;
             switch( wParam )
             {
             case VK_ESCAPE:
@@ -906,8 +1035,8 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
                         GetWindowRect( hwnd, &rect );
                         GetCursorPos( &point );
 
-                        d->window->data.x = point.x;
-                        d->window->data.y = point.y;
+                        impl->window->data.x = point.x;
+                        impl->window->data.y = point.y;
                         SetWindowPos( hwnd, HWND_TOP, point.x, point.y, rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER );
                     }
                     handle();
@@ -919,7 +1048,7 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
                 {
                     if( *( input.space = pressed ) )
                     {
-                        d->window->image.output();
+                        impl->window->image.output();
                     }
                     handle();
                     return 0;
@@ -940,8 +1069,8 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
                 {
                     if( *( input.f1 = pressed ) )
                     {
-                        if( d->window->data.help )
-                            d->window->data.help->run();
+                        if( impl->window->data.help )
+                            impl->window->data.help->run();
                     }
                     handle();
                     return 0;
@@ -952,7 +1081,7 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
 
             if( !system && ( 'A' <= wParam && wParam <= 'Z' ) )
             {
-                auto &key = d->window->inputData.keys.letter( wParam );
+                auto &key = impl->window->inputData.keys.letter( wParam );
                 key = pressed;
                 handle();
                 return 0;
@@ -962,7 +1091,7 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
         return DefWindowProc( hwnd, message, wParam, lParam );
     };
 
-    windowData = new WindowData( windowProc, this );
+    implementation = new Implementation( windowProc, this );
 
     auto &x = data.x;
     auto &y = data.y;
@@ -1000,7 +1129,7 @@ ImageWindow::ImageWindow( ImageDataBase &image_, HandleMsg handleMsg_, Data init
 
 ImageWindow::~ImageWindow()
 {
-    delete windowData;
+    delete implementation;
 }
 
 void ImageWindow::run()
@@ -1011,25 +1140,29 @@ void ImageWindow::run()
         return;
     }
 
-    windowData->g.content.prepare( image( 0, 0 ), image.s(), image.h() );
-
-    auto hwnd = CreateWindowExW( WS_EX_LAYERED,
-                                 windowData->className.c_str(),
-                                 windowData->name.c_str(),
-                                 WS_POPUP | WS_THICKFRAME | WS_VISIBLE,
-                                 *data.x, *data.y, windowData->g.getMinX(), windowData->g.getMinY(),
-                                 nullptr, nullptr, GetModuleHandleW( nullptr ), windowData );
-
+    implementation->g.content.prepare( image( 0, 0 ), image.s(), image.h() );
+    auto hwnd = implementation->hwnd = CreateWindowExW( WS_EX_LAYERED,
+                                       implementation->className.c_str(),
+                                       implementation->name.c_str(),
+                                       WS_POPUP | WS_THICKFRAME | WS_VISIBLE,
+                                       *data.x, *data.y, implementation->g.getMinX(), implementation->g.getMinY(),
+                                       nullptr, nullptr, GetModuleHandleW( nullptr ), implementation );
     makeException( hwnd );
 
-    SetFocus( hwnd );
-    SetForegroundWindow( hwnd );
-
     MSG msg;
-    while( GetMessage( &msg, nullptr, 0, 0 ) )
+    BOOL result;
+    while( implementation->hwnd && ( result = GetMessageW( &msg, hwnd, 0, 0 ) ) != 0 )
     {
-        TranslateMessage( &msg );
-        DispatchMessage( &msg );
+        if( result == -1 )
+        {
+            makeException( false );
+            break;
+        }
+        else
+        {
+            TranslateMessage( &msg );
+            DispatchMessage( &msg );
+        }
     }
 }
 

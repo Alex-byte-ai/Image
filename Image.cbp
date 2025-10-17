@@ -66,6 +66,8 @@
 					<Add option="-Wl,-Map=Debug\bin\main.map" />
 					<Add library="Msimg32" />
 					<Add library="comdlg32" />
+					<Add library="comctl32" />
+					<Add library="shlwapi" />
 					<Add library="gdi32" />
 					<Add library="zlibstatic" />
 					<Add directory="../Zlib-1.3.1" />
@@ -126,6 +128,8 @@
 					<Add option="-fexceptions" />
 					<Add library="Msimg32" />
 					<Add library="comdlg32" />
+					<Add library="comctl32" />
+					<Add library="shlwapi" />
 					<Add library="gdi32" />
 					<Add library="zlibstatic" />
 					<Add directory="../Zlib-1.3.1" />
@@ -255,6 +259,8 @@
 		<Unit filename="ImageDataBase.h" />
 		<Unit filename="ImageWindow.cpp" />
 		<Unit filename="ImageWindow.h" />
+		<Unit filename="JustEdit.cpp" />
+		<Unit filename="JustEdit.h" />
 		<Unit filename="Line.cpp" />
 		<Unit filename="Line.h" />
 		<Unit filename="Outline.cpp" />
@@ -263,6 +269,8 @@
 		<Unit filename="Overlap.h" />
 		<Unit filename="Palette.cpp" />
 		<Unit filename="Palette.h" />
+		<Unit filename="ProceduralTextures.cpp" />
+		<Unit filename="ProceduralTextures.h" />
 		<Unit filename="Quadrangle.cpp" />
 		<Unit filename="Quadrangle.h" />
 		<Unit filename="Text.cpp" />
@@ -334,6 +342,10 @@
 		<Unit filename="tests/Test_29_Carpet.h" />
 		<Unit filename="tests/Test_30_Flower.cpp" />
 		<Unit filename="tests/Test_30_Flower.h" />
+		<Unit filename="tests/Test_31_Procedural_textures.cpp" />
+		<Unit filename="tests/Test_31_Procedural_textures.h" />
+		<Unit filename="tests/Test_32_JustEdit.cpp" />
+		<Unit filename="tests/Test_32_JustEdit.h" />
 		<Unit filename="tests/Test_X0.cpp" />
 		<Unit filename="tests/Test_X0.h" />
 		<Unit filename="tests/Test_X1.cpp" />

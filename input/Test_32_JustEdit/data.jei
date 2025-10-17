@@ -1,0 +1,56 @@
+{
+	v0: true,
+	v1: false,
+	v2: 1,
+	v3: -3.4,
+	v5: "\tabc\n\\\"'",
+	v6: 'xyz',
+	v7: {
+		v0: true,
+		v1: false,
+		v2: 1,
+		v3: -3.4,
+		v5: "abc",
+		v6: 'xyz',
+		v7: {
+			v0: true,
+			v1: false,
+			v2: 1,
+			v3: -3.4,
+			v5: "abc",
+			v6: 'xyz'
+		},
+		v8: [
+			true,
+			false,
+			1,
+			-3.4,
+			"abc",
+			'xyz'
+		]
+	},
+	v8: [
+		true,
+		false,
+		1,
+		-3.4,
+		"abc",
+		'xyz',
+		{
+			v0: true,
+			v1: false,
+			v2: 1,
+			v3: -3.4,
+			v5: "abc",
+			v6: 'xyz'
+		},
+		[
+			true,
+			false,
+			1,
+			-3.4,
+			"abc",
+			'xyz'
+		]
+	]
+}

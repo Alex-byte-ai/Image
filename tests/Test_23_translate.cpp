@@ -28,15 +28,30 @@ void Test_23_Translate( Context &context )
 
     ImageData image;
 
+    struct Compare
+    {
+        bool operator()( const std::filesystem::path& a, const std::filesystem::path& b ) const
+        {
+            return compare( a.wstring().c_str(), b.wstring().c_str() );
+        }
+    };
+
     struct Image
     {
         const std::filesystem::path& path;
         std::vector<uint8_t> content;
 
+        Image( const Image& other ) : path( other.path ), content( other.content )
+        {}
+
+        Image( Image&& other ) : path( other.path ), content( std::move( other.content ) )
+        {}
+
         Image( const std::filesystem::path& p, std::vector<uint8_t>&& c ) : path( p ), content( c )
         {}
     };
-    std::map<std::filesystem::path, size_t> index;
+
+    std::map<std::filesystem::path, size_t, Compare> index;
     std::vector<Image> samples;
     size_t volume = 0;
 
@@ -86,6 +101,21 @@ void Test_23_Translate( Context &context )
         samples.clear();
         index.clear();
         volume = 0;
+    };
+
+    auto sort = [&]()
+    {
+        std::vector<Image> sortSamples;
+        sortSamples.reserve( samples.size() );
+
+        size_t i = 0;
+        for( auto& [path, id] : index )
+        {
+            sortSamples.emplace_back( std::move( samples[id] ) );
+            id = i++;
+        }
+
+        samples = std::move( sortSamples );
     };
 
     get( L"input/abstract_space.bmp" );
@@ -277,6 +307,7 @@ void Test_23_Translate( Context &context )
                 erase();
                 for( auto &file : files )
                     get( file, false );
+                sort();
 
                 sId = 0;
                 redraw();
