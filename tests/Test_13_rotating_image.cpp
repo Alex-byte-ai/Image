@@ -1,4 +1,4 @@
-﻿#include "Test_13_rotating_image.h"
+#include "Test_13_rotating_image.h"
 
 #include <fstream>
 
@@ -14,7 +14,7 @@
 class Frame
 {
 private:
-    Canvas canvas;
+    Overlap::Canvas canvas;
     double speed, rx, ry;
     Vector2D center;
 
@@ -209,7 +209,7 @@ private:
             ImageData image;
             frame->canvas.render( image );
 
-            Picture picture( image );
+            Overlap::Picture picture( image );
             picture.set( position );
             canvas.draw( picture );
         }

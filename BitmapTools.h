@@ -1,10 +1,10 @@
-﻿#pragma once
+#pragma once
 
 #include <windows.h>
 
-#include <vector>
-#include <cstdint>
 #include <optional>
+#include <cstdint>
+#include <vector>
 
 #include "Buffer.h"
 

@@ -340,8 +340,8 @@ static void experiment1( ConsoleOutput &text, Context &, bool, bool showImages )
     background.input( L"input\\tree.png" );
     spot.input( L"input\\64x32.png" );
 
-    Canvas canvas( background );
-    Picture picture( spot );
+    Overlap::Canvas canvas( background );
+    Overlap::Picture picture( spot );
 
     auto draw = [&]()
     {

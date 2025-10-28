@@ -10,5 +10,7 @@ public:
     void boundingBox( Vector2D &p0, Vector2D &p1 ) const;
     void flip();
 
+    double area( size_t n ) const;
+
     static double commonArea( Quadrangle q0, Quadrangle q1 );
 };

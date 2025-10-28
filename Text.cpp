@@ -1,7 +1,6 @@
-﻿#include "Text.h"
+#include "Text.h"
 
-#undef min
-#undef max
+#include <windows.h>
 
 #include <optional>
 #include <sstream>
@@ -11,7 +10,6 @@
 #include "Lambda.h"
 #include "Basic.h"
 
-#include "BitmapTools.h"
 #include "ImageData.h"
 
 template<typename T>
@@ -233,7 +231,15 @@ static bool manageText( const TextGraphics &text, TextGraphics::Data *data, Imag
         size = count * sizeof( Pixel );
 
         BITMAPINFO bmpInfo;
-        BitmapTools::init( bmpInfo, area->w(), area->h() );
+        memset( &bmpInfo, 0, sizeof( bmpInfo ) );
+        bmpInfo.bmiHeader.biSize = sizeof( BITMAPINFOHEADER );
+        bmpInfo.bmiHeader.biWidth = area->w();
+        bmpInfo.bmiHeader.biHeight = -area->h(); // Top-down DIB
+        bmpInfo.bmiHeader.biPlanes = 1;
+        bmpInfo.bmiHeader.biBitCount = 32;
+        bmpInfo.bmiHeader.biCompression = BI_RGB;
+        bmpInfo.bmiHeader.biSizeImage = count * sizeof( RGBQUAD );
+
         HBITMAP hBitmap = CreateDIBSection( hdc, &bmpInfo, DIB_RGB_COLORS, &bits, nullptr, 0 );
         if( !hBitmap )
             return false;

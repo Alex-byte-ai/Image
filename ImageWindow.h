@@ -11,6 +11,54 @@
 #include "ImageDataBase.h"
 #include "JustEdit.h"
 
+namespace GraphicInterface
+{
+struct Box
+{
+    int x = 0, y = 0, w = 0, h = 0;
+
+    bool inside( int x0, int y0 );
+};
+
+struct Image : public Box
+{
+    std::vector<uint32_t> pixels;
+    int bufferW = 0, bufferH = 0;
+
+    void prepare( const void *data, int stride, int height );
+};
+
+struct Description
+{
+    Description( int h, int sz, int bh, int tgw, int b );
+    Description( const Description &other ) = default;
+
+    int titlebarHeight, buttonSize, buttonSpacingH, buttonSpacingV, triggerWidth, borderWidth;
+
+    Box window, title, minimizeButton, maximizeButton, closeButton, leftBorder, rightBorder, topBorder, bottomBorder, client;
+    Box topTrigger, bottomTrigger, leftTrigger, rightTrigger;
+    Image icon, text, content;
+
+    int getMinX() const;
+    int getMinY() const;
+
+    void update();
+    void draw( uint32_t *pixels, int x, int y );
+};
+
+uint32_t makeColor( uint8_t r, uint8_t g, uint8_t b, uint8_t a );
+void drawRect( uint32_t *pixels, int width, int height, const Box &b, uint32_t color );
+void drawGradient( uint32_t *pixels, int width, int height, const Box &b );
+void drawImage( uint32_t *pixels, int width, int height, const Image &b );
+void drawLineR( uint32_t *pixels, int width, int, int x, int y, int size, uint32_t color );
+void drawLineD( uint32_t *pixels, int width, int, int x, int y, int size, uint32_t color );
+void drawLineRD( uint32_t *pixels, int width, int, int x, int y, int size, uint32_t color );
+void drawLineRU( uint32_t *pixels, int width, int, int x, int y, int size, uint32_t color );
+void cross( uint32_t *pixels, int width, int height, const Box &b, bool selected );
+void square( uint32_t *pixels, int width, int height, const Box &b, bool selected );
+void line( uint32_t *pixels, int width, int height, const Box &b, bool selected );
+}
+
 class ImageWindow
 {
 public:
@@ -44,7 +92,7 @@ public:
     class InputData
     {
     public:
-        ChangedValue<bool> escape, shift, space, enter, leftMouse, rightMouse, middleMouse, f1;
+        ChangedValue<bool> up, down, left, right, escape, del, shift, ctrl, space, enter, leftMouse, rightMouse, middleMouse, f1;
         ChangedValue<int> mouseX{ -1 }, mouseY{ -1 };
         bool init;
         Keys keys;
@@ -76,7 +124,7 @@ public:
         {}
     };
 
-    ImageWindow( ImageDataBase &image, HandleMsg handleMsg, JustEdit::Entity* root = nullptr, Data initData = Data() );
+    ImageWindow( ImageDataBase &image, HandleMsg handleMsg, std::shared_ptr<JustEdit::Entity> root = nullptr, Data initData = Data() );
     ~ImageWindow();
 
     void run();
@@ -90,12 +138,11 @@ private:
     InputData inputData;
     OutputData outputData;
 
-    JustEdit::Entity* root;
+    std::shared_ptr<JustEdit::Entity> rootObject;
     HandleMsg handleMsg;
 
     ImageDataBase &image;
     Data data;
 
-    class DefaultSettings;
-    static std::unique_ptr<DefaultSettings> defaultSettings;
+    static std::unique_ptr<GraphicInterface::Description> defaultSettings;
 };

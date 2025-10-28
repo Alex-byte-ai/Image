@@ -1,11 +1,9 @@
-﻿#pragma once
+#pragma once
 
 #include <optional>
 #include <cstdint>
 #include <string>
 #include <map>
-
-#include "Buffer.h"
 
 #include "ImageDataBase.h"
 

@@ -103,8 +103,8 @@ static void DrawTextOnBackground( const ImageWindow::InputData &inputData, Image
 
 static void DrawTransformedImage( const ImageWindow::InputData &inputData, ImageWindow::OutputData &outputData )
 {
-    static std::unique_ptr<Picture> picture;
-    static std::unique_ptr<Canvas> canvas;
+    static std::unique_ptr<Overlap::Picture> picture;
+    static std::unique_ptr<Overlap::Canvas> canvas;
     static double ang = 0, xs = 1, ys = 1;
     static ImageData background, spot;
     static int transformId = 0;
@@ -116,13 +116,13 @@ static void DrawTransformedImage( const ImageWindow::InputData &inputData, Image
         if( background.empty() )
         {
             background.input( L"input\\tree.png" );
-            canvas = std::make_unique<Canvas>( background );
+            canvas = std::make_unique<Overlap::Canvas>( background );
         }
 
         if( spot.empty() )
         {
             spot.input( L"input\\64x32.png" );
-            picture = std::make_unique<Picture>( spot );
+            picture = std::make_unique<Overlap::Picture>( spot );
         }
 
         if( transformId == 0 )

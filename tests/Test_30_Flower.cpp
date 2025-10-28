@@ -34,10 +34,10 @@ static void chunk( ImageData& image, GrowthParameters& p )
         Affine2D( Matrix2D::Scale( 0.25, 0.25 ) ) *
         Affine2D( Vector2D( 0, -ry ) );
 
-    Picture oval( sample );
+    Overlap::Picture oval( sample );
     oval.set( position );
 
-    Canvas canvas( image );
+    Overlap::Canvas canvas( image );
     canvas.draw( oval );
     canvas.render( image );
 

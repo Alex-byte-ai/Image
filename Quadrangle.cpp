@@ -149,6 +149,12 @@ void Quadrangle::flip()
     std::swap( a[0].y, a[2].y );
 }
 
+double Quadrangle::area( size_t n ) const
+{
+    FastVector<const Vector2D, 8> q( a, n );
+    return ::area( q );
+}
+
 double Quadrangle::commonArea( Quadrangle q0, Quadrangle q1 )
 {
     size_t n0 = 4, n1 = 4;
@@ -159,5 +165,5 @@ double Quadrangle::commonArea( Quadrangle q0, Quadrangle q1 )
         q1.flip();
 
     clip( vq0, vq1 );
-    return sign * area( vq0 );
+    return sign * ::area( vq0 );
 }
