@@ -1,4 +1,4 @@
-﻿#include "Line.h"
+#include "Line.h"
 
 #include "Basic.h"
 

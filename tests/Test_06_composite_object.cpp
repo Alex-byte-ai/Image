@@ -1,4 +1,4 @@
-﻿#include "Test_06_composite_object.h"
+#include "Test_06_composite_object.h"
 
 #include "Vector2D.h"
 #include "Matrix2D.h"

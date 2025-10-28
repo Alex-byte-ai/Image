@@ -1,4 +1,4 @@
-﻿#include "Test_16_ICO.h"
+#include "Test_16_ICO.h"
 
 #include <algorithm>
 

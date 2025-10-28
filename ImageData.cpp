@@ -1,4 +1,4 @@
-﻿#include "ImageData.h"
+#include "ImageData.h"
 
 #include <algorithm>
 #include <fstream>

@@ -1,4 +1,4 @@
-﻿#include "Test_29_Carpet.h"
+#include "Test_29_Carpet.h"
 
 #include "../ImageData.h"
 

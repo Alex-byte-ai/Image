@@ -1,4 +1,4 @@
-﻿#include "Test_05_interactive_window.h"
+#include "Test_05_interactive_window.h"
 
 #include <memory>
 

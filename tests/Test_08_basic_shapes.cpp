@@ -1,4 +1,4 @@
-﻿#include "Test_08_basic_shapes.h"
+#include "Test_08_basic_shapes.h"
 
 #include "../ImageWindow.h"
 #include "../ImageData.h"

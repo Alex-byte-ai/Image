@@ -1,4 +1,4 @@
-﻿#include "Test_14_tiling.h"
+#include "Test_14_tiling.h"
 
 #include "../ImageWindow.h"
 #include "../ImageData.h"

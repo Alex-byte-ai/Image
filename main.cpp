@@ -1,4 +1,4 @@
-﻿#include "Clipboard.h"
+#include "Clipboard.h"
 #include "Exception.h"
 #include "Console.h"
 #include "Window.h"

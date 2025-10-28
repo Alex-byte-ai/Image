@@ -1,4 +1,4 @@
-﻿#include "Quadrangle.h"
+#include "Quadrangle.h"
 
 #include <array>
 

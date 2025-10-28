@@ -1,4 +1,4 @@
-﻿#include "Test_21_Mandelbrot_set.h"
+#include "Test_21_Mandelbrot_set.h"
 
 #include "Complex.h"
 #include "Basic.h"

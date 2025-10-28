@@ -1,4 +1,4 @@
-﻿#include "CheckProgress.h"
+#include "CheckProgress.h"
 
 #include <windows.h>
 

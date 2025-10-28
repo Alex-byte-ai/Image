@@ -1,4 +1,4 @@
-﻿#include "GetImage.h"
+#include "GetImage.h"
 
 #include <windows.h>
 

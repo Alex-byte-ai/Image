@@ -1,4 +1,4 @@
-﻿#include "Palette.h"
+#include "Palette.h"
 
 void Palette::add( const Pixel &c )
 {

@@ -1,4 +1,4 @@
-﻿#include "Test_19_icon_for_console.h"
+#include "Test_19_icon_for_console.h"
 
 #include <algorithm>
 

@@ -1,4 +1,4 @@
-﻿#include "Test_02_stride_difference.h"
+#include "Test_02_stride_difference.h"
 
 #include "../ImageWindow.h"
 #include "../ImageData.h"

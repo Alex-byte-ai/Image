@@ -1,4 +1,4 @@
-﻿#include "BitmapTools.h"
+#include "BitmapTools.h"
 
 #include "Lambda.h"
 

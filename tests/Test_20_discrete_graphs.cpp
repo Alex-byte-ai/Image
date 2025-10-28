@@ -1,4 +1,4 @@
-﻿#include "Test_20_discrete_graphs.h"
+#include "Test_20_discrete_graphs.h"
 
 #include "Basic.h"
 

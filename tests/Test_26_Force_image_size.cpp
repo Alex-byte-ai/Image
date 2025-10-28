@@ -1,4 +1,4 @@
-﻿#include "Test_26_Force_image_size.h"
+#include "Test_26_Force_image_size.h"
 
 #include "../ImageData.h"
 #include "../GetImage.h"

@@ -1,4 +1,4 @@
-﻿#include "Test_27_Mesh.h"
+#include "Test_27_Mesh.h"
 
 #include <set>
 

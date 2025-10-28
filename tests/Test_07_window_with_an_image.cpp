@@ -1,4 +1,4 @@
-﻿#include "Test_07_window_with_an_image.h"
+#include "Test_07_window_with_an_image.h"
 
 #include "../ImageWindow.h"
 #include "../ImageData.h"

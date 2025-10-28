@@ -1,4 +1,4 @@
-﻿#include "Test_11_tasks.h"
+#include "Test_11_tasks.h"
 
 #include "Library.h"
 

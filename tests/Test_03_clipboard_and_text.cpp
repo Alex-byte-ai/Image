@@ -1,4 +1,4 @@
-﻿#include "Test_03_clipboard_and_text.h"
+#include "Test_03_clipboard_and_text.h"
 
 #include "Clipboard.h"
 

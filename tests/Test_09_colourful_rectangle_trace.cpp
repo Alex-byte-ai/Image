@@ -1,4 +1,4 @@
-﻿#include "Test_09_colourful_rectangle_trace.h"
+#include "Test_09_colourful_rectangle_trace.h"
 
 #include "../ImageWindow.h"
 #include "../ImageData.h"

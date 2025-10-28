@@ -1,1 +1,1 @@
-﻿#include "Curve.h"
+#include "Curve.h"

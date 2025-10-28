@@ -1,4 +1,4 @@
-﻿#include "Test_23_Translate.h"
+#include "Test_23_Translate.h"
 
 #include <algorithm>
 #include <fstream>

@@ -1,4 +1,4 @@
-﻿#include "Test_22_Polygon.h"
+#include "Test_22_Polygon.h"
 
 #include "RandomNumber.h"
 #include "Affine2D.h"

@@ -1,4 +1,4 @@
-﻿#include "Test_12_watermelon.h"
+#include "Test_12_watermelon.h"
 
 #include "RandomNumber.h"
 

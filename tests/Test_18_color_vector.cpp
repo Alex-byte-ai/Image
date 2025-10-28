@@ -1,4 +1,4 @@
-﻿#include "Test_18_color_vector.h"
+#include "Test_18_color_vector.h"
 
 #include "../ImageData.h"
 

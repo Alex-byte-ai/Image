@@ -1,4 +1,4 @@
-﻿#include "Test_25_remove_checkered_pattern.h"
+#include "Test_25_remove_checkered_pattern.h"
 
 #include "../ImageWindow.h"
 #include "../ImageData.h"

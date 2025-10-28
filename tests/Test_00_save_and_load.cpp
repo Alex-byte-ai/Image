@@ -1,4 +1,4 @@
-﻿#include "Test_00_save_and_load.h"
+#include "Test_00_save_and_load.h"
 
 #include "../ImageWindow.h"
 #include "../ImageData.h"

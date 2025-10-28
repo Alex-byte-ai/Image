@@ -1,4 +1,4 @@
-﻿#include "Ellipse.h"
+#include "Ellipse.h"
 
 // Helper: queue up the first‐quadrant point ( x, y ) into all needed symmetric pixels
 void DrawEllipse::fillPending( int x, int y )

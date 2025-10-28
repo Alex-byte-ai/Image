@@ -1,4 +1,4 @@
-﻿#include "Test_X3.h"
+#include "Test_X3.h"
 
 #include "GetPathToFile.h"
 

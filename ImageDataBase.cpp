@@ -1,4 +1,4 @@
-﻿#include "ImageDataBase.h"
+#include "ImageDataBase.h"
 
 #include "Exception.h"
 #include "Basic.h"

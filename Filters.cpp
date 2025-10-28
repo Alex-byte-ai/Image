@@ -1,4 +1,4 @@
-﻿#include "Filters.h"
+#include "Filters.h"
 
 #include "MatrixArithmetic.h"
 #include "Exception.h"

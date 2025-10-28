@@ -1,4 +1,4 @@
-﻿#include "ApplyKernel.h"
+#include "ApplyKernel.h"
 
 #include "Basic.h"
 

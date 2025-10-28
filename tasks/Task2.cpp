@@ -1,4 +1,4 @@
-﻿#include "Tasks.h"
+#include "Tasks.h"
 
 #include <fstream>
 

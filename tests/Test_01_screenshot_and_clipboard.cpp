@@ -1,4 +1,4 @@
-﻿#include "Test_01_screenshot_and_clipboard.h"
+#include "Test_01_screenshot_and_clipboard.h"
 
 #include "Clipboard.h"
 

@@ -1,4 +1,4 @@
-﻿#include "CompositeObject.h"
+#include "CompositeObject.h"
 
 #include <sstream>
 

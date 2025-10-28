@@ -1,4 +1,4 @@
-﻿#include "Test_10_resaving_transparent_image.h"
+#include "Test_10_resaving_transparent_image.h"
 
 #include "../ImageData.h"
 

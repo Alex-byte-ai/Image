@@ -1,4 +1,4 @@
-﻿#include "Test_31_Procedural_textures.h"
+#include "Test_31_Procedural_textures.h"
 
 #include "../ProceduralTextures.h"
 

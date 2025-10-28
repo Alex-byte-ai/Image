@@ -1,4 +1,4 @@
-﻿#include "Test_15_DDS.h"
+#include "Test_15_DDS.h"
 
 #include "../ImageData.h"
 

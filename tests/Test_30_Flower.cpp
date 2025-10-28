@@ -1,4 +1,4 @@
-﻿#include "Test_30_Flower.h"
+#include "Test_30_Flower.h"
 
 #include "RandomNumber.h"
 #include "Affine2D.h"

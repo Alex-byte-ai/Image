@@ -1,4 +1,4 @@
-﻿#include "Test_24_icon_for_image.h"
+#include "Test_24_icon_for_image.h"
 
 #include <algorithm>
 
