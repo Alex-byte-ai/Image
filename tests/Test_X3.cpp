@@ -1,6 +1,6 @@
 #include "Test_X3.h"
 
-#include "GetPathToFile.h"
+#include "Window.h"
 
 #include "../ApplyKernel.h"
 #include "../ImageWindow.h"
@@ -16,7 +16,7 @@ void Test_X3( Context &context )
     std::filesystem::path path0, path1;
     ImageData in, mask, ou0, out;
 
-    auto p = OpenPath();
+    auto p = openPath();
     if( !p.has_value() )
         return;
 

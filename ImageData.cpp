@@ -3,10 +3,10 @@
 #include <algorithm>
 #include <fstream>
 
-#include "GetPathToFile.h"
 #include "Image/Translate.h"
 #include "Exception.h"
 #include "Lambda.h"
+#include "Window.h"
 #include "Basic.h"
 
 #include "GetImage.h"
@@ -243,7 +243,7 @@ bool ImageData::output( const std::filesystem::path &path ) const
 
 bool ImageData::input()
 {
-    auto path = OpenPath();
+    auto path = openPath();
     if( !path )
         return false;
     return input( *path );
@@ -251,7 +251,7 @@ bool ImageData::input()
 
 bool ImageData::output() const
 {
-    auto path = SavePath();
+    auto path = savePath();
     if( !path )
         return false;
     return output( *path );

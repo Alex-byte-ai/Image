@@ -1,6 +1,6 @@
 #include "Test_X0.h"
 
-#include "GetPathToFile.h"
+#include "Window.h"
 
 #include "../ImageWindow.h"
 #include "../ImageData.h"
@@ -18,7 +18,7 @@ void Test_X0( Context &context )
 
     text << L"Open input\\in.png\n";
 
-    auto p = OpenPath();
+    auto p = openPath();
     if( !p.has_value() )
         return;
 

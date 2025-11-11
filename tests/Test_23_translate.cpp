@@ -5,7 +5,7 @@
 #include <set>
 
 #include "Image/Translate.h"
-#include "GetPathToFile.h"
+#include "Window.h"
 #include "Basic.h"
 
 #include "../ImageWindow.h"
@@ -283,7 +283,7 @@ void Test_23_Translate( Context &context )
 
         if( inputVariableData && keyDown( 'L' ) )
         {
-            auto p = OpenPath();
+            auto p = openPath();
             if( p )
             {
                 std::set<std::filesystem::path> folders;
@@ -316,7 +316,7 @@ void Test_23_Translate( Context &context )
 
         if( writeDisk && outputVariableData && keyDown( 'F' ) && *inputData.keys.letter( 'S' ) )
         {
-            auto path = SavePath();
+            auto path = savePath();
             if( path )
             {
                 ImageConvert::Reference data;
