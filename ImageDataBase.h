@@ -52,6 +52,7 @@ public:
     Color pad( Color other, int count = 1 ) const;
 
     Color limit() const;
+    bool valid() const;
 };
 
 class ImageDataBase;

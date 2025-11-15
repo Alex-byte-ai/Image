@@ -66,28 +66,9 @@ Color Color::invert() const
 
 Color::operator const Pixel() const
 {
-    double _r, _g, _b, _a;
-
-    _r = r;
-    _g = g;
-    _b = b;
-    _a = a;
-
-    makeException( -epsilon < r && r < 1 + epsilon &&
-                   -epsilon < g && g < 1 + epsilon &&
-                   -epsilon < b && b < 1 + epsilon &&
-                   -epsilon < a && a < 1 + epsilon );
-
-    if( _r > 1 ) _r = 1;
-    if( _r < 0 ) _r = 0;
-    if( _g > 1 ) _g = 1;
-    if( _g < 0 ) _g = 0;
-    if( _b > 1 ) _b = 1;
-    if( _b < 0 ) _b = 0;
-    if( _a > 1 ) _a = 1;
-    if( _a < 0 ) _a = 0;
-
-    return Pixel( Round( _r * 255 ), Round( _g * 255 ), Round( _b * 255 ), Round( _a * 255 ) );
+    makeException( valid() );
+    Color c = limit();
+    return Pixel( Round( c.r * 255 ), Round( c.g * 255 ), Round( c.b * 255 ), Round( c.a * 255 ) );
 }
 
 Color Color::operator+( Color other ) const
@@ -191,4 +172,12 @@ Color Color::limit() const
     if( result.a > 1 ) result.a = 1;
     if( result.a < 0 ) result.a = 0;
     return result;
+}
+
+bool Color::valid() const
+{
+    return -epsilon < r && r < 1 + epsilon &&
+           -epsilon < g && g < 1 + epsilon &&
+           -epsilon < b && b < 1 + epsilon &&
+           -epsilon < a && a < 1 + epsilon;
 }
