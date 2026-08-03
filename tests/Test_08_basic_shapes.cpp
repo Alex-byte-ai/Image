@@ -264,16 +264,23 @@ void Test_08_basic_shapes( Context &context )
             *canvas.currentId = ( *canvas.currentId + 1 ) % shapes1.size();
             redraw();
             text << description << "\n";
+            return true;
         }
 
         if( inputData.rightMouse.changed() && *inputData.rightMouse )
         {
             canvas.ignoreContour = !canvas.ignoreContour;
             redraw();
+            return true;
         }
 
         if( inputData.mouseX.changed() || inputData.mouseY.changed() )
+        {
             redraw();
+            return true;
+        }
+
+        return false;
     };
 
     if( showImages )

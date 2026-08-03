@@ -187,13 +187,17 @@ void Test_20_discrete_graphs( Context &context )
         {
             id = ( id + 1 ) % functions.size();
             drawGraph( outputData.image.get() );
+            return true;
         }
 
         if( keyDown( 'S' ) )
         {
             b = -b;
             drawGraph( outputData.image.get() );
+            return true;
         }
+
+        return false;
     };
 
     if( showImages )

@@ -4,11 +4,14 @@
 #include <algorithm>
 #include <set>
 
-#include "GetPathToFile.h"
 #include "Information.h"
 #include "Exception.h"
 #include "ImageData.h"
+#include "Window.h"
 #include "Text.h"
+
+#include <exception>
+#include <UnicodeString.h>
 
 namespace JustEdit
 {
@@ -116,7 +119,9 @@ public:
             };
             get = [pointer]()
             {
-                return std::to_wstring( *pointer );
+                std::wstringstream string;
+                string << *pointer;
+                return string.str();
             };
         }
         else if constexpr( std::is_same<T, double>() )
@@ -139,7 +144,9 @@ public:
             };
             get = [pointer]()
             {
-                return std::to_wstring( *pointer );
+                std::wstringstream string;
+                string << std::setprecision( 4 ) << *pointer;
+                return string.str();
             };
         }
         else if constexpr( std::is_same<T, bool>() )
@@ -221,6 +228,10 @@ inline MetaData entityData( Object& o )
         return true;
     } );
 
+    auto i = names.find( o.name );
+    if( i != names.end() )
+        names.erase( i );
+
     MetaData l;
     l.add( L"name", o.name, {}, names );
     l.add( L"x", o.position.shift.x );
@@ -292,7 +303,7 @@ inline MetaData pointData( Object& o )
     MetaData l;
     l.add( L"x", o.position.shift.x );
     l.add( L"y", o.position.shift.y );
-    l.add( L"sprite", o.spriteId, {L"circle", L"square", L"rhombus", L"large"} );
+    l.add( L"sprite", o.spriteId, {L"none", L"circle", L"square", L"rhombus", L"large"} );
     return l;
 }
 
@@ -323,7 +334,7 @@ void Position::operator()( const Affine2D& p )
     shift = p.s;
 }
 
-Entity::Entity() : root( nullptr ), contour( 0, 0, 1 ), fill( 1, 1, 0 ), thickness( 2 )
+Entity::Entity() : structure( false ), root( nullptr ), id( -1 ), contour( 0, 0, 1 ), fill( 1, 1, 0 ), thickness( 2 )
 {}
 
 Entity::Entity( std::wstring n, const Position& p ) : Entity()
@@ -342,38 +353,85 @@ std::wstring Entity::description() const
 
 Entity *Entity::add( std::shared_ptr<Entity> node )
 {
-    if( isComplex() && node )
-    {
-        node->root = this;
-        return nodes.emplace_back( std::move( node ) ).get();
-    }
-    return nullptr;
+    return add( std::move( node ), nodes.size() );
 }
 
-std::shared_ptr<Entity> Entity::remove( const Entity* node )
+Entity *Entity::add( std::shared_ptr<Entity> node, size_t index )
 {
-    std::vector<std::shared_ptr<Entity>> newNodes;
-    newNodes.reserve( nodes.size() );
-
-    std::shared_ptr<Entity> removed;
-
-    for( auto&& candidate : nodes )
+    if( node && isComplex() && index <= nodes.size() )
     {
-        if( candidate.get() != node )
-            newNodes.emplace_back( candidate );
-        else
-            removed = candidate;
-    }
+        auto result = node.get();
 
-    nodes = std::move( newNodes );
-    return removed;
+        auto iterator = nodes.emplace( nodes.begin() + index, std::move( node ) );
+        makeException( iterator != nodes.end() );
+
+        result->root = this;
+
+        size_t i = 0;
+        for( auto& n : nodes )
+            n->id = i++;
+
+        return result;
+    }
+    return nullptr;
 }
 
 std::shared_ptr<Entity> Entity::detach()
 {
-    if( root )
-        return root->remove( this );
-    return nullptr;
+    if( !root )
+        return nullptr;
+
+    auto& rnodes = root->nodes;
+    auto result = rnodes[id];
+
+    rnodes.erase( rnodes.begin() + id );
+
+    size_t i = 0;
+    for( auto& node : rnodes )
+        node->id = i++;
+
+    root = nullptr;
+
+    makeException( result.get() == this );
+    return result;
+}
+
+std::vector<size_t> Entity::getPath() const
+{
+    std::vector<size_t> result;
+    const Entity *r = this, *next = root;
+    while( next )
+    {
+        result.push_back( r->id );
+        r = next;
+        next = next->root;
+    }
+    return result;
+}
+
+Entity *Entity::getObject( const std::vector<size_t>& p, size_t skip )
+{
+    Entity *result = this;
+    if( skip >= p.size() )
+        return result;
+
+    auto i = p.rbegin(), end = p.rbegin() + ( p.size() - skip );
+    while( i != end )
+    {
+        auto index = *i;
+        if( index >= result->nodes.size() )
+            return nullptr;
+
+        result = result->nodes[index].get();
+        ++i;
+    }
+
+    return result;
+}
+
+size_t Entity::getId() const
+{
+    return id;
 }
 
 std::vector<const Entity*> Entity::getNodes() const
@@ -513,6 +571,20 @@ static std::shared_ptr<Entity> extract( const Information::Item & storage, const
     {
         object = std::make_shared<Point>();
     }
+    else if( type == L"Polygon" )
+    {
+        auto polygon = std::make_shared<Polygon>();
+
+        auto &array = storage( L"points" ).as<Array>();
+        for( auto &pt : array )
+            polygon->points.emplace_back( pt( L"x" ).as<long double>(), pt( L"y" ).as<long double>() );
+
+        object = polygon;
+    }
+    else if( type == L"Perspective" )
+    {
+        object = std::make_shared<Perspective>();
+    }
     else
     {
         makeException( false );
@@ -557,6 +629,8 @@ static std::shared_ptr<Entity> extract( const Information::Item & storage, const
     for( auto& name : array )
         object->add( extract( storage( ( std::wstring )name.as<String>() ), path / fname ) );
 
+    object->dumpStructure();
+
     return object;
 }
 
@@ -577,25 +651,38 @@ std::shared_ptr<Entity> Entity::load( const std::filesystem::path& path )
     return nullptr;
 }
 
-bool Entity::save() const
+void Entity::save( bool *success ) const
 {
-    auto path = SavePath();
-    if( path )
-        return save( *path );
-    return false;
+    savePath( [this, success]( const auto & path )
+    {
+        if( success )
+            *success = path.has_value();
+        if( path )
+            save( *path );
+    } );
 }
 
-std::shared_ptr<Entity> Entity::load()
+void Entity::load( std::function<void( std::shared_ptr<Entity>& )> callback )
 {
-    auto path = OpenPath();
-    if( path )
-        return load( *path );
-    return nullptr;
+    openPath( [call = std::move( callback )]( const auto & path )
+    {
+        std::shared_ptr<Entity> object = path ? load( *path ) : nullptr;
+        call( object );
+    } );
 }
 
-Affine2D Entity::globalPosition( const Entity* r ) const
+Affine2D Entity::globalPosition( const Entity* level ) const
 {
-    return root == r ? position() : root->globalPosition( r ) * position();
+    auto p = Affine2D( Vector2D() );
+    auto object = this;
+
+    while( object != level )
+    {
+        p = object->position() * p;
+        object = object->root;
+    }
+
+    return p;
 }
 
 DeserializationData Entity::deserializationData()
@@ -605,7 +692,7 @@ DeserializationData Entity::deserializationData()
 
 EditData Entity::editData()
 {
-    return entityData( *this ).select<0, 6, 7>();
+    return entityData( *this ).select<0, 6, 7, 5>();
 }
 
 void Entity::data( SerializationDescription& s ) const
@@ -613,13 +700,28 @@ void Entity::data( SerializationDescription& s ) const
     entityData( *this ).assemble( s );
 }
 
-bool Entity::establishVirtualStructure()
+bool Entity::establishStructure()
 {
-    return false;
+    if( !isComplex() || structure )
+        return false;
+
+    structure = true;
+    return true;
 }
 
-void Entity::dumpVirtualStructure()
-{}
+bool Entity::dumpStructure()
+{
+    if( !structure )
+        return false;
+
+    structure = false;
+    return true;
+}
+
+bool Entity::hasStructure() const
+{
+    return structure;
+}
 
 Group::Group() : Entity()
 {}
@@ -627,15 +729,15 @@ Group::Group() : Entity()
 Group::Group( std::wstring n, const Position& p ) : Entity( std::move( n ), p )
 {}
 
-Entity *Group::pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode mode )
+Entity *Group::pointsTo( const Affine2D& transform, const Vector2D& point )
 {
     auto p = transform.inv()( point );
     for( auto i = nodes.rbegin(); i != nodes.rend(); ++i )
     {
         auto& node = *i;
-        auto object = node->pointsTo( node->position(), p, mode == SelectionMode::Object ? SelectionMode::Object : SelectionMode::Group );
+        auto object = node->pointsTo( node->position(), p );
         if( object )
-            return mode == SelectionMode::Group ? this : object;
+            return structure ? object : this;
     }
     return nullptr;
 }
@@ -686,38 +788,57 @@ Raster::Raster() : Entity(), image( std::make_shared<ImageData>() )
 Raster::Raster( std::wstring n, int64_t width, int64_t height, const Position& p ) : Entity( std::move( n ), p ), image( std::make_shared<ImageData>() ), w( width ), h( height )
 {}
 
-Entity *Raster::pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode mode )
+Entity *Raster::pointsTo( const Affine2D& transform, const Vector2D& point )
 {
     auto p = transform.inv()( point );
-    if( !( 0 <= p.x && p.x <= image->w() && 0 <= p.y && p.y <= image->h() ) )
-        return nullptr;
+
+    bool inside = 0 <= p.x && p.x <= image->w() && 0 <= p.y && p.y <= image->h();
+    if( !structure )
+        return inside ? this : nullptr;
 
     for( auto i = nodes.rbegin(); i != nodes.rend(); ++i )
     {
         auto& node = *i;
-        auto object = node->pointsTo( node->position(), p, mode == SelectionMode::Object ? SelectionMode::Object : SelectionMode::Group );
+        auto object = node->pointsTo( node->position(), p );
         if( object )
-            return mode == SelectionMode::Group ? this : object;
+            return object;
     }
 
-    return this;
+    return inside ? this : nullptr;
 }
 
 bool Raster::draw( const Affine2D& transform, Overlap::Canvas& canvas ) const
 {
     image->crop( *image, 0, 0, Max( Abs( w ), 1 ), Max( Abs( h ), 1 ), ( Pixel )fill );
 
-    Overlap::Canvas self( *image );
-    for( auto& node : nodes )
+    if( structure )
     {
-        if( !node->draw( node->position(), self ) )
-            return false;
+        Overlap::Picture picture( *image );
+        picture.set( transform );
+        canvas.draw( picture );
+        canvas.bake();
+
+        for( auto& node : nodes )
+        {
+            if( !node->draw( transform * node->position(), canvas ) )
+                return false;
+        }
+    }
+    else
+    {
+        Overlap::Canvas self( *image );
+        for( auto& node : nodes )
+        {
+            if( !node->draw( node->position(), self ) )
+                return false;
+        }
+
+        Overlap::Picture picture( self );
+        picture.set( transform );
+        canvas.draw( picture );
+        canvas.bake();
     }
 
-    Overlap::Picture picture( self );
-    picture.set( transform );
-    canvas.draw( picture );
-    canvas.bake();
     return true;
 }
 
@@ -754,7 +875,7 @@ DeserializationData Raster::deserializationData()
 
 EditData Raster::editData()
 {
-    return rasterData( *this ).select<0, 6, 7>();
+    return rasterData( *this ).select<0, 6, 7, 5>();
 }
 
 void Raster::data( SerializationDescription& s ) const
@@ -770,7 +891,7 @@ Line::Line( std::wstring n, const Vector2D& start, const Vector2D& finish ) : En
     point = finish - start;
 }
 
-Entity *Line::pointsTo( const Affine2D& transform, const Vector2D& pt, SelectionMode )
+Entity *Line::pointsTo( const Affine2D& transform, const Vector2D& pt )
 {
     auto p = transform.inv()( pt );
     p = Affine2D( Matrix2D::Rotation( -ArcTan2( point.y, point.x ) ) )( p );
@@ -814,7 +935,7 @@ DeserializationData Line::deserializationData()
 
 EditData Line::editData()
 {
-    return lineData( *this ).select<0, 6, 7>();
+    return lineData( *this ).select<0, 6, 7, 5>();
 }
 
 void Line::data( SerializationDescription& s ) const
@@ -828,7 +949,7 @@ Rectangle::Rectangle() : Entity()
 Rectangle::Rectangle( std::wstring n, double width, double height, const Position& p ) : Entity( std::move( n ), Position( p ) ), w( width ), h( height )
 {}
 
-Entity *Rectangle::pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode )
+Entity *Rectangle::pointsTo( const Affine2D& transform, const Vector2D& point )
 {
     auto p = transform.inv()( point );
     return 0 <= p.x && p.x <= w && 0 <= p.y && p.y <= h ? this : nullptr;
@@ -873,7 +994,7 @@ DeserializationData Rectangle::deserializationData()
 
 EditData Rectangle::editData()
 {
-    return rectangleData( *this ).select<0, 6, 7>();
+    return rectangleData( *this ).select<0, 6, 7, 5>();
 }
 
 void Rectangle::data( SerializationDescription& s ) const
@@ -887,7 +1008,7 @@ Circle::Circle() : Entity()
 Circle::Circle( std::wstring n, const Vector2D& center, double radius ) : Entity( std::move( n ), Position( center ) ), r( radius )
 {}
 
-Entity *Circle::pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode )
+Entity *Circle::pointsTo( const Affine2D& transform, const Vector2D& point )
 {
     auto p = transform.inv()( point );
     return p.Abs() < Abs( r ) ? this : nullptr;
@@ -930,7 +1051,7 @@ DeserializationData Circle::deserializationData()
 
 EditData Circle::editData()
 {
-    return circleData( *this ).select<0, 6, 7>();
+    return circleData( *this ).select<0, 6, 7, 5>();
 }
 
 void Circle::data( SerializationDescription& s ) const
@@ -944,13 +1065,18 @@ Text::Text() : Entity(), w( -1 ), h( -1 )
 Text::Text( std::wstring n, std::wstring t, const Position& p ) : Entity( std::move( n ), p ), text( std::move( t ) ), w( -1 ), h( -1 )
 {}
 
-Entity *Text::pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode )
+Entity *Text::pointsTo( const Affine2D& transform, const Vector2D& point )
 {
     TextGraphics g;
     g.set( L"text", text );
 
     if( w <= 0 || h <= 0 )
-        g.measure( w, h );
+    {
+        int width = 0, height = 0;
+        g.measure( width, height );
+        w = width;
+        h = height;
+    }
 
     auto p = transform.inv()( point );
     return 0 < p.x && p.x < w && 0 < p.y && p.y < h ? this : nullptr;
@@ -1007,7 +1133,7 @@ DeserializationData Text::deserializationData()
 
 EditData Text::editData()
 {
-    return textData( *this ).select<0, 6, 7>();
+    return textData( *this ).select<0, 6, 7, 5>();
 }
 
 void Text::data( SerializationDescription& s ) const
@@ -1015,14 +1141,17 @@ void Text::data( SerializationDescription& s ) const
     textData( *this ).assemble( s );
 }
 
-Point::Point() : Entity(), spriteId( 0 )
+Point::Point() : Entity(), spriteId( 1 )
 {}
 
-Point::Point( std::wstring n, uint16_t id, const Vector2D& p ) : Entity( std::move( n ), Position( p ) ), spriteId( id )
+Point::Point( std::wstring n, uint16_t sprite, const Vector2D& p ) : Entity( std::move( n ), Position( p ) ), spriteId( sprite )
 {}
 
-Entity *Point::pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode )
+Entity *Point::pointsTo( const Affine2D& transform, const Vector2D& point )
 {
+    if( spriteId == 0 )
+        return nullptr;
+
     Affine2D shift = transform;
     shift.t = Matrix2D::Identity();
     auto p = shift.inv()( point );
@@ -1034,36 +1163,55 @@ bool Point::draw( const Affine2D& transform, Overlap::Canvas& canvas ) const
     Affine2D shift = transform;
     shift.t = Matrix2D::Identity();
 
+    auto rhombus = [this]( ImageData & img, int size, const Pixel &  pcontour, const Pixel & pfill )
+    {
+        int m = size / 2;
+
+        int a = m, b = m;
+        for( int i = 0; i < size; ++i )
+        {
+            *img( a, i ) = pcontour;
+            *img( b, i ) = pcontour;
+            for( int j = a + 1; j < b; ++j )
+            {
+                *img( j, i ) = pfill;
+            }
+
+            int step = i < m ? 1 : -1;
+            a -= step;
+            b += step;
+        }
+    };
+
     ImageData self;
     switch( spriteId )
     {
     case 0:
-        self.reset( 9, 9 );
-        self.circle( 4, 4, 4, ( Pixel )contour );
-        *self( 4, 4 ) = ( Pixel )contour;
-        shift.s.x -= 4;
-        shift.s.y -= 4;
         break;
     case 1:
         self.reset( 9, 9 );
-        self.rectangle( 0, 0, 9, 9, ( Pixel )contour );
+        self.circle( 4, 4, 4, ( Pixel )contour, ( Pixel )fill );
         *self( 4, 4 ) = ( Pixel )contour;
         shift.s.x -= 4;
         shift.s.y -= 4;
         break;
     case 2:
         self.reset( 9, 9 );
-        self.line( 0, 4, 5, -1, ( Pixel )contour );
-        self.line( 4, 0, 9, 5, ( Pixel )contour );
-        self.line( 8, 4, 3, 9, ( Pixel )contour );
-        self.line( 4, 8, -1, 3, ( Pixel )contour );
+        self.rectangle( 0, 0, 9, 9, ( Pixel )contour, ( Pixel )fill );
         *self( 4, 4 ) = ( Pixel )contour;
         shift.s.x -= 4;
         shift.s.y -= 4;
         break;
     case 3:
+        self.reset( 9, 9 );
+        rhombus( self, 9, ( Pixel )contour, ( Pixel )fill );
+        *self( 4, 4 ) = ( Pixel )contour;
+        shift.s.x -= 4;
+        shift.s.y -= 4;
+        break;
+    case 4:
         self.reset( 25, 25 );
-        self.circle( 12, 12, 12, ( Pixel )contour );
+        self.circle( 12, 12, 12, ( Pixel )contour, ( Pixel )fill );
         shift.s.x -= 12;
         shift.s.y -= 12;
         break;
@@ -1082,7 +1230,8 @@ bool Point::draw( const Affine2D& transform, Overlap::Canvas& canvas ) const
 bool Point::size( const Affine2D& transform, Vector2D& topLeft, Vector2D& bottomRight ) const
 {
     Vector2D shift;
-    shift.x = shift.y = spriteId < 3 ? 4 : 12;
+    if( spriteId > 0 )
+        shift.x = shift.y = spriteId < 3 ? 4 : 12;
 
     topLeft = bottomRight = transform.s;
     topLeft -= shift;
@@ -1107,7 +1256,7 @@ DeserializationData Point::deserializationData()
 
 EditData Point::editData()
 {
-    return pointData( *this ).select<0, 6, 7>();
+    return pointData( *this ).select<0, 6, 7, 5>();
 }
 
 void Point::data( SerializationDescription& s ) const
@@ -1116,9 +1265,7 @@ void Point::data( SerializationDescription& s ) const
 }
 
 Polygon::Polygon() : Group()
-{
-    setup();
-}
+{}
 
 Polygon::Polygon( std::wstring n, const Position& p ) : Group( std::move( n ), p )
 {
@@ -1130,7 +1277,7 @@ void Polygon::setup()
     points = {{0.0, 0.0}, {96.0, 0.0}, {96.0, 96.0}, {0.0, 96.0}};
 }
 
-Entity *Polygon::pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode mode )
+Entity *Polygon::pointsTo( const Affine2D& transform, const Vector2D& point )
 {
     if( nodes.empty() )
     {
@@ -1142,24 +1289,16 @@ Entity *Polygon::pointsTo( const Affine2D& transform, const Vector2D& point, Sel
 
         return topLeft.x <= p.x && p.x <= bottomRight.x && topLeft.y <= p.y && p.y <= bottomRight.y ? this : nullptr;
     }
-    return Group::pointsTo( transform, point, mode );
+    return Group::pointsTo( transform, point );
 }
 
 bool Polygon::draw( const Affine2D& transform, Overlap::Canvas& canvas ) const
 {
     if( nodes.empty() )
     {
-        Vector2D p0, p1;
-        p1 = transform( points[0] );
-
-        auto size = points.size();
-        for( size_t i = 0; i < size; ++i )
-        {
-            p0 = p1;
-            p1 = transform( points[( i + 1 ) % size] );
-            canvas.draw( p0, p1, thickness, contour );
-            canvas.bake();
-        }
+        canvas.draw( transform, points, thickness, contour, fill );
+        canvas.fix();
+        canvas.bake();
         return true;
     }
     return Group::draw( transform, canvas );
@@ -1167,7 +1306,17 @@ bool Polygon::draw( const Affine2D& transform, Overlap::Canvas& canvas ) const
 
 bool Polygon::size( const Affine2D& transform, Vector2D& topLeft, Vector2D& bottomRight ) const
 {
-    boundingBox( points, transform, topLeft, bottomRight );
+    if( !nodes.empty() )
+    {
+        std::vector<Vector2D> pts;
+        for( auto& node : nodes )
+            pts.push_back( node->position.shift );
+        boundingBox( pts, transform, topLeft, bottomRight );
+    }
+    else
+    {
+        boundingBox( points, transform, topLeft, bottomRight );
+    }
     return true;
 }
 
@@ -1176,20 +1325,26 @@ std::wstring Polygon::type() const
     return L"Polygon";
 }
 
-bool Polygon::establishVirtualStructure()
+bool Polygon::establishStructure()
 {
+    auto result = Group::establishStructure();
+    if( !result )
+        return false;
+
     size_t i = 0;
     for( auto& point : points )
     {
-        add( std::make_shared<Point>( std::to_wstring( i ), 0, point ) );
+        add( std::make_shared<Point>( std::to_wstring( i ), 1, point ) );
         ++i;
     }
+    points.clear();
     return true;
 }
 
-void Polygon::dumpVirtualStructure()
+bool Polygon::dumpStructure()
 {
-    points.clear();
+    if( !structure )
+        return false;
 
     size_t i = 0;
     for( auto& node : nodes )
@@ -1199,75 +1354,232 @@ void Polygon::dumpVirtualStructure()
     }
 
     nodes.clear();
-    if( points.empty() )
+    if( points.size() < 3 )
         setup();
+
+    makeException( Group::dumpStructure() );
+    return true;
 }
 
-Selection::Selection() : Group( L"selection" ), marker( nullptr ), cramped( false )
+void Polygon::data( SerializationDescription& s ) const
 {
-    add( std::make_shared<Point>( L".l.t", 1 ) );
-    add( std::make_shared<Point>( L".r.t", 1 ) );
-    add( std::make_shared<Point>( L".r.b", 1 ) );
-    add( std::make_shared<Point>( L".l.b", 1 ) );
+    using namespace Information;
 
-    add( std::make_shared<Point>( L".t", 0 ) );
-    add( std::make_shared<Point>( L".r", 0 ) );
-    add( std::make_shared<Point>( L".b", 0 ) );
-    add( std::make_shared<Point>( L".l", 0 ) );
+    entityData( *this ).assemble( s );
 
-    add( std::make_shared<Point>( L".~t", 2 ) );
-    add( std::make_shared<Point>( L".~r", 2 ) );
-    add( std::make_shared<Point>( L".~b", 2 ) );
-    add( std::make_shared<Point>( L".~l", 2 ) );
+    auto arr = s.info( L"points" ) = Array();
+    auto& array = arr.as<Array>();
 
-    add( std::make_shared<Point>( L".*", 3 ) );
-    add( std::make_shared<Point>( L".#", 0 ) );
+    for( auto& point : points )
+    {
+        Item item;
+        item( L"x" ) = point.x;
+        item( L"y" ) = point.y;
+        array.push( std::move( item ) );
+    }
 }
 
-Entity *Selection::pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode mode )
+Perspective::Perspective() : Group()
 {
+    structure = true;
+}
+
+Perspective::Perspective( std::wstring n, std::shared_ptr<Entity> trg, const Position& p ) : Group( std::move( n ), p )
+{
+    structure = true;
+
+    auto target = trg.get();
+    add( std::move( trg ) );
+
+    auto poly0 = std::make_shared<JustEdit::Polygon>( name + L"_frame0" );
+    auto poly1 = std::make_shared<JustEdit::Polygon>( name + L"_frame1" );
+
+    add( poly0 );
+    add( poly1 );
+
+    poly0->contour = Color( 0, 1, 1 );
+    poly1->contour = Color( 1, 0, 0 );
+
+    Vector2D topLeft, bottomRight;
+    std::vector<Vector2D> points;
+    if( target->size( Affine2D( Vector2D() ), topLeft, bottomRight ) )
+    {
+        points = {topLeft, {bottomRight.x, topLeft.y}, bottomRight, {topLeft.x, bottomRight.y}};
+    }
+    else
+    {
+        points = std::move( poly0->points );
+    }
+
+    poly0->points = points;
+
+    auto middle = ( points[0] + points[1] ) * 0.5;
+    points[0] = ( points[0] - middle ) * 0.75 + middle;
+    points[1] = ( points[1] - middle ) * 0.75 + middle;
+    poly1->points = std::move( points );
+
+    makeException( dumpStructure() );
+}
+
+Entity *Perspective::pointsTo( const Affine2D& transform, const Vector2D& point )
+{
+    if( structure )
+        return Group::pointsTo( transform, point );
+
+    auto p = transform.inv()( point );
+
+    Vector2D topLeft, bottomRight;
+    if( !size( Affine2D( Vector2D() ), topLeft, bottomRight ) )
+        return nullptr;
+
+    return topLeft.x <= p.x && p.x <= bottomRight.x && topLeft.y <= p.y && p.y <= bottomRight.y ? this : nullptr;
+
+}
+
+bool Perspective::draw( const Affine2D& transform, Overlap::Canvas& canvas ) const
+{
+    if( structure )
+        return Group::draw( transform, canvas );
+
+    Overlap::Canvas self( *dynamic_cast<Raster*>( nodes[0].get() )->image );
+    Overlap::Picture picture( self );
+    picture.set( Affine2D( Vector2D() ) );
+    picture.apply( frame0, frame1 );
+    picture.apply( transform );
+    canvas.draw( picture );
+    canvas.bake();
+    return true;
+}
+
+bool Perspective::size( const Affine2D& transform, Vector2D& topLeft, Vector2D& bottomRight ) const
+{
+    if( structure )
+        return Group::size( transform, topLeft, bottomRight );
+
+    auto& image = *dynamic_cast<Raster*>( nodes[0].get() )->image;
+    boundingBox(
+    {
+        frame1.p( frame0.uv( {0.0, 0.0} ) ),
+        frame1.p( frame0.uv( {double( image.w() ), 0.0} ) ),
+        frame1.p( frame0.uv( {double( image.w() ), double( image.h() )} ) ),
+        frame1.p( frame0.uv( {0.0, double( image.h() )} ) )
+    },
+    transform, topLeft, bottomRight );
+    return true;
+}
+
+std::wstring Perspective::type() const
+{
+    return L"Perspective";
+}
+
+bool Perspective::establishStructure()
+{
+    return Group::establishStructure();
+}
+
+bool Perspective::dumpStructure()
+{
+    if( !structure )
+        return false;
+
+    Polygon *poly0, *poly1;
+    bool criteria = ( nodes.size() == 3 ) && dynamic_cast<Raster*>( nodes[0].get() ) && ( poly0 = dynamic_cast<Polygon*>( nodes[1].get() ) ) && ( poly1 = dynamic_cast<Polygon*>( nodes[2].get() ) );
+    if( criteria )
+        criteria = poly0->points.size() == 4 && poly1->points.size();
+    if( !criteria )
+        return false;
+
+    auto& p0 = poly0->points;
+    frame0 = Overlap::Frame( p0[0], p0[1], p0[2], p0[3] );
+
+    auto& p1 = poly1->points;
+    frame1 = Overlap::Frame( p1[0], p1[1], p1[2], p1[3] );
+
+    makeException( Group::dumpStructure() );
+    return true;
+}
+
+Selection::Selection() : Group( L"selection" ), marker( nullptr ), positionRoot( nullptr )
+{
+    structure = true;
+
+    add( std::make_shared<Point>( L".l.t", 2 ) );
+    add( std::make_shared<Point>( L".r.t", 2 ) );
+    add( std::make_shared<Point>( L".r.b", 2 ) );
+    add( std::make_shared<Point>( L".l.b", 2 ) );
+
+    add( std::make_shared<Point>( L".t", 1 ) );
+    add( std::make_shared<Point>( L".r", 1 ) );
+    add( std::make_shared<Point>( L".b", 1 ) );
+    add( std::make_shared<Point>( L".l", 1 ) );
+
+    add( std::make_shared<Point>( L".~t", 3 ) );
+    add( std::make_shared<Point>( L".~r", 3 ) );
+    add( std::make_shared<Point>( L".~b", 3 ) );
+    add( std::make_shared<Point>( L".~l", 3 ) );
+
+    add( std::make_shared<Point>( L".*", 4 ) );
+    add( std::make_shared<Point>( L".#", 1 ) );
+
+    for( auto& node : nodes )
+    {
+        node->fill = Color( 1, 0, 1 );
+        node->contour = Color( 0, 1, 0 );
+    }
+}
+
+Entity *Selection::pointsTo( const Affine2D& transform, const Vector2D& point )
+{
+    if( !isSelected() )
+        return nullptr;
+
+    Vector2D topLeft, bottomRight;
+    size( transform, topLeft, bottomRight );
+
+    auto area = bottomRight - topLeft;
+    auto angle = topLeft;
+    bool cramped = area.x < 65 || area.y < 65;
+
     if( cramped )
     {
-        auto p = transform.inv()( point );
-        if( !( angle.x <= p.x && p.x <= angle.x + area.x && angle.y <= p.y && p.y <= angle.y + area.y ) )
-            return nullptr;
-
-        return mode == SelectionMode::Group ? this : nodes[13].get();
+        if( angle.x <= point.x && point.x <= angle.x + area.x && angle.y <= point.y && point.y <= angle.y + area.y )
+            return nodes[13].get();
+        return nullptr;
     }
-    return Group::pointsTo( transform, point, mode );
+
+    return Group::pointsTo( transform, point );
 }
 
 bool Selection::draw( const Affine2D& transform, Overlap::Canvas& canvas ) const
 {
+    if( !isSelected() )
+        return true;
+
+    Vector2D topLeft, bottomRight;
+    size( transform, topLeft, bottomRight );
+    auto area = bottomRight - topLeft;
+    bool cramped = area.x < 65 || area.y < 65;
+
     if( cramped )
     {
-        canvas.draw( transform * Affine2D( angle ), area.x, area.y, 0, {}, Color( 1, 0, 0, 0.5 ) );
+        auto angle = topLeft;
+        canvas.draw( Affine2D( angle ), area.x, area.y, 0, {}, Color( 1, 0, 0, 0.5 ) );
         canvas.bake();
         return true;
     }
-    return Group::draw( transform, canvas );
-}
 
-std::shared_ptr<Entity> Selection::extract()
-{
-    return unselection ? std::move( unselection ) : detach();
+    return Group::draw( transform, canvas );
 }
 
 void Selection::select( Entity *t, bool add )
 {
-    auto unselect = [this]()
-    {
-        if( !unselection )
-            unselection = std::dynamic_pointer_cast<Selection>( detach() );
-        targets.clear();
-    };
-
     marker = nullptr;
 
-    if( !t || t == this || !t->getRoot() || !t->getRoot()->isComplex() )
+    if( !t || t == this )
     {
         if( !add )
-            unselect();
+            targets.clear();
         return;
     }
 
@@ -1275,16 +1587,13 @@ void Selection::select( Entity *t, bool add )
     if( !t->size( t->position(), tl, br ) )
     {
         if( !add )
-            unselect();
+            targets.clear();
         return;
     }
 
     if( !add || targets.empty() )
     {
-        unselect();
-        if( !t->getRoot()->add( unselection ) )
-            return;
-        unselection = nullptr;
+        targets.clear();
     }
     else
     {
@@ -1296,8 +1605,6 @@ void Selection::select( Entity *t, bool add )
     if( i != targets.end() )
     {
         targets.erase( i );
-        if( targets.empty() )
-            unselect();
     }
     else
     {
@@ -1317,21 +1624,27 @@ std::vector<Entity*> Selection::getTargets()
     return targets;
 }
 
-bool Selection::grab( const Vector2D& point )
+void Selection::setRoot( Entity *r )
 {
-    marker = pointsTo( position(), point, JustEdit::SelectionMode::Part );
+    positionRoot = r;
+}
+
+bool Selection::grab( const Affine2D& transform, const Vector2D& point )
+{
+    marker = pointsTo( transform, point );
     auto selected = getTarget();
     if( selected && marker )
     {
-        initialPosition = selected->position();
+        initialPositionGlobal = selected->globalPosition( positionRoot );
+        initialPositionLocal = selected->position();
         if( marker->name.find( L".*" ) == std::wstring::npos )
         {
-            grabOrigin = initialPosition.inv()( point );
+            grabOrigin = ( transform * initialPositionGlobal ).inv()( point );
         }
         else
         {
             grabOrigin = marker->position.shift;
-            auto v = point - grabOrigin;
+            auto v = transform.inv()( point ) - grabOrigin;
             initialRotation = ArcTan2( v.y, v.x );
         }
         return true;
@@ -1339,7 +1652,7 @@ bool Selection::grab( const Vector2D& point )
     return false;
 }
 
-bool Selection::move( const Vector2D& point )
+bool Selection::move( const Affine2D& transform, const Vector2D& point )
 {
     auto selected = getTarget();
     if( selected && marker )
@@ -1350,11 +1663,11 @@ bool Selection::move( const Vector2D& point )
 
         if( marker->name.find( L".*" ) != std::wstring::npos )
         {
-            auto v = point - grabOrigin;
+            auto v = transform.inv()( point ) - grabOrigin;
             auto rotation = ArcTan2( v.y, v.x ) - initialRotation;
 
-            selected->position( initialPosition );
-            auto grabOriginLocal = initialPosition.inv()( grabOrigin );
+            selected->position( initialPositionLocal );
+            auto grabOriginLocal = initialPositionLocal.inv()( grabOrigin );
 
             selected->position.rotation += rotation;
             auto grabOriginNew = selected->position()( grabOriginLocal );
@@ -1375,34 +1688,32 @@ bool Selection::move( const Vector2D& point )
         };
 
         auto size = bottomRight - topLeft;
-        auto delta = initialPosition.inv()( point ) - grabOrigin;
-        Affine2D transform;
-
-        transform = Affine2D( Vector2D() );
+        auto delta = ( transform * initialPositionGlobal ).inv()( point ) - grabOrigin;
+        auto deform = Affine2D( Vector2D() );
 
         if( marker->name.find( L".~t" ) != std::wstring::npos )
         {
             auto shearX = delta.x / ( grabOrigin.y - bottomRight.y );
-            transform.t = Matrix2D( 1, shearX, 0, 1 );
-            transform.s = Vector2D( -shearX * bottomRight.y, 0 );
+            deform.t = Matrix2D( 1, shearX, 0, 1 );
+            deform.s = Vector2D( -shearX * bottomRight.y, 0 );
         }
         else if( marker->name.find( L".~r" ) != std::wstring::npos )
         {
             auto shearY = delta.y / ( grabOrigin.x - topLeft.x );
-            transform.t = Matrix2D( 1, 0, shearY, 1 );
-            transform.s = Vector2D( 0, -shearY * topLeft.x );
+            deform.t = Matrix2D( 1, 0, shearY, 1 );
+            deform.s = Vector2D( 0, -shearY * topLeft.x );
         }
         else if( marker->name.find( L".~b" ) != std::wstring::npos )
         {
             auto shearX = delta.x / ( grabOrigin.y - topLeft.y );
-            transform.t = Matrix2D( 1, shearX, 0, 1 );
-            transform.s = Vector2D( -shearX * topLeft.y, 0 );
+            deform.t = Matrix2D( 1, shearX, 0, 1 );
+            deform.s = Vector2D( -shearX * topLeft.y, 0 );
         }
         else if( marker->name.find( L".~l" ) != std::wstring::npos )
         {
             auto shearY = delta.y / ( grabOrigin.x - bottomRight.x );
-            transform.t = Matrix2D( 1, 0, shearY, 1 );
-            transform.s = Vector2D( 0, -shearY * bottomRight.x );
+            deform.t = Matrix2D( 1, 0, shearY, 1 );
+            deform.s = Vector2D( 0, -shearY * bottomRight.x );
         }
 
         if( marker->name.find( L".l" ) != std::wstring::npos )
@@ -1410,16 +1721,16 @@ bool Selection::move( const Vector2D& point )
             auto scaleX = fix( ( size.x - delta.x ) / size.x );
             auto scaleBorder = topLeft.x * scaleX;
             auto border = topLeft.x + delta.x;
-            transform.t.a00 = scaleX;
-            transform.s.x = border - scaleBorder;
+            deform.t.a00 = scaleX;
+            deform.s.x = border - scaleBorder;
         }
         else if( marker->name.find( L".r" ) != std::wstring::npos )
         {
             auto scaleX = fix( ( size.x + delta.x ) / size.x );
             auto scaleBorder = bottomRight.x * scaleX;
             auto border = bottomRight.x + delta.x;
-            transform.t.a00 = scaleX;
-            transform.s.x = border - scaleBorder;
+            deform.t.a00 = scaleX;
+            deform.s.x = border - scaleBorder;
         }
 
         if( marker->name.find( L".t" ) != std::wstring::npos )
@@ -1427,23 +1738,23 @@ bool Selection::move( const Vector2D& point )
             auto scaleY = fix( ( size.y - delta.y ) / size.y );
             auto scaleBorder = topLeft.y * scaleY;
             auto border = topLeft.y + delta.y;
-            transform.t.a11 = scaleY;
-            transform.s.y = border - scaleBorder;
+            deform.t.a11 = scaleY;
+            deform.s.y = border - scaleBorder;
         }
         else if( marker->name.find( L".b" ) != std::wstring::npos )
         {
             auto scaleY = fix( ( size.y + delta.y ) / size.y );
             auto scaleBorder = bottomRight.y * scaleY;
             auto border = bottomRight.y + delta.y;
-            transform.t.a11 = scaleY;
-            transform.s.y = border - scaleBorder;
+            deform.t.a11 = scaleY;
+            deform.s.y = border - scaleBorder;
         }
 
         if( marker->name.find( L".#" ) != std::wstring::npos )
-            transform.s = delta;
+            deform.s = delta;
 
         Position modification;
-        modification( initialPosition * transform );
+        modification( initialPositionLocal * deform );
         selected->position = modification;
         update();
         return true;
@@ -1464,7 +1775,7 @@ void Selection::update()
     Vector2D topLeft, bottomRight;
     for( auto object : targets )
     {
-        if( object->size( target ? Affine2D( Vector2D() ) : object->position(), topLeft, bottomRight ) )
+        if( object->size( target ? Affine2D( Vector2D() ) : object->globalPosition( positionRoot ), topLeft, bottomRight ) )
         {
             points.push_back( topLeft );
             points.push_back( bottomRight );
@@ -1473,7 +1784,7 @@ void Selection::update()
 
     boundingBox( points, Affine2D( Vector2D() ), topLeft, bottomRight );
 
-    auto transformation = target ? target->position() : Affine2D( Vector2D() );
+    auto transformation = target ? target->globalPosition( positionRoot ) : Affine2D( Vector2D() );
 
     auto p0 = nodes[0]->position.shift = transformation( topLeft );
     auto p1 = nodes[1]->position.shift = transformation( Vector2D( bottomRight.x, topLeft.y ) );
@@ -1492,22 +1803,11 @@ void Selection::update()
     nodes[9]->position.shift = p5 + 12 * ( p12 - p5 ).Normal();
     nodes[10]->position.shift = p6 + 12 * ( p12 - p6 ).Normal();
     nodes[11]->position.shift = p7 + 12 * ( p12 - p7 ).Normal();
+}
 
-    points.clear();
-    for( auto& node : nodes )
-    {
-        if( node->size( node->position(), topLeft, bottomRight ) )
-        {
-            points.push_back( topLeft );
-            points.push_back( bottomRight );
-        }
-    }
-
-    boundingBox( points, Affine2D( Vector2D() ), topLeft, bottomRight );
-
-    area = bottomRight - topLeft;
-    angle = topLeft;
-    cramped = area.x < 65 || area.y < 65;
+bool Selection::isSelected() const
+{
+    return !targets.empty();
 }
 
 std::wstring Selection::type() const

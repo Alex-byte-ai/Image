@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <set>
 
 #include "Image/Translate.h"
 #include "Exception.h"
@@ -241,20 +242,29 @@ bool ImageData::output( const std::filesystem::path &path ) const
     return false;
 }
 
-bool ImageData::input()
+void ImageData::input( bool *success )
 {
-    auto path = openPath();
-    if( !path )
-        return false;
-    return input( *path );
+    openPath( [this, success]( const auto & path )
+    {
+        if( success )
+            *success = path.has_value();
+        if( path )
+            input( *path );
+    } );
 }
 
-bool ImageData::output() const
+void ImageData::output( bool *success ) const
 {
-    auto path = savePath();
-    if( !path )
-        return false;
-    return output( *path );
+    auto image = std::make_shared<ImageData>();
+    copy( *image );
+
+    savePath( [image, success]( const auto & path )
+    {
+        if( success )
+            *success = path.has_value();
+        if( path )
+            image->output( *path );
+    } );
 }
 
 bool ImageData::readDDS( const std::filesystem::path &path, std::vector<ImageData> &images )
@@ -886,3 +896,53 @@ void ImageData::placeTransperent( ImageDataBase &imageDataBase, int x, int y ) c
         }
     }
 }
+
+static bool mark( std::set<std::pair<int, int>>& pixels, const ImageData& image, MatrixBase<bool>& mask, const Pixel & sample )
+{
+    std::set<std::pair<int, int>> next;
+
+    for( auto& [j, i] : pixels )
+        *mask( j, i ) = true;
+
+    int width = image.w();
+    int height = image.h();
+
+    auto extend = [&]( int j, int i )
+    {
+        if( 0 <= j && j < width && 0 <= i && i < height && !*mask( j, i ) && *image( j, i ) == sample )
+            next.emplace( j, i );
+    };
+
+    for( auto& [j, i] : pixels )
+    {
+        extend( j - 1, i - 1 );
+        extend( j - 1, i - 0 );
+        extend( j - 1, i + 1 );
+        extend( j - 0, i - 1 );
+        extend( j - 0, i + 1 );
+        extend( j + 1, i - 1 );
+        extend( j + 1, i - 0 );
+        extend( j + 1, i + 1 );
+    }
+
+    pixels = std::move( next );
+    return !pixels.empty();
+};
+
+void ImageData::fill( MatrixBase<bool>& mask, int j, int i ) const
+{
+    auto& image = *this;
+    auto sample = image( j, i );
+    if( sample )
+    {
+        std::set<std::pair<int, int>> pixels;
+        Pixel smpl;
+
+        pixels.emplace( j, i );
+        mask.reset( image.w(), image.h() );
+        smpl = *sample;
+
+        while( mark( pixels, image, mask, smpl ) )
+        {}
+    }
+};

@@ -29,8 +29,8 @@ public:
     bool input( const std::filesystem::path &path ) override;
     bool output( const std::filesystem::path &path ) const override;
 
-    bool input() override;
-    bool output() const override;
+    void input( bool *success = nullptr ) override;
+    void output( bool *success = nullptr ) const override;
 
     static bool readDDS( const std::filesystem::path &path, std::vector<ImageData> &images );
     static bool writeDDS( const std::filesystem::path &path, const std::vector<ImageData> &images );
@@ -52,4 +52,6 @@ public:
     void function( ImageDataBase &out, const std::function<void( double, double, const Color &, Color & )> &f ) const override;
 
     void placeTransperent( ImageDataBase &out, int x, int y ) const override;
+
+    void fill( MatrixBase<bool>& mask, int j, int i ) const override;
 };

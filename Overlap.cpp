@@ -2,9 +2,86 @@
 
 #include <vector>
 
+#include "Exception.h"
 #include "Basic.h"
+
 namespace Overlap
 {
+Frame::Frame()
+{}
+
+Frame::Frame( const Vector2D& p0, const Vector2D& p1, const Vector2D& p2, const Vector2D& p3 ) : o( p0 ), j( p1 - p0 ), i( p3 - p0 ), f( p2 - p1 - p3 + p0 )
+{}
+
+Vector2D Frame::uv( const Vector2D& point, short sign ) const
+{
+    double a, b, c, u, v;
+    auto p = point - o;
+    Vector2D d;
+
+    a = f.L() * j;
+    b = i.L() * j - f.L() * p;
+    c = -i.L() * p;
+
+    if( Abs( a ) > Vector2D::epsilon )
+    {
+        auto det = b * b - 4 * a * c;
+
+        makeException( det >= 0 );
+        det = Sqrt( det );
+
+        auto u0 = ( -b + det ) / ( 2 * a );
+        auto u1 = ( -b - det ) / ( 2 * a );
+
+        if( sign == 0 )
+        {
+            if( u0 < 0 || 1 < u0 )
+                std::swap( u0, u1 );
+
+            u = u0;
+            d = i + u0 * f;
+            if( Abs( d.x ) <= Vector2D::epsilon && Abs( d.y ) <= Vector2D::epsilon )
+            {
+                u = u1;
+                d = i + u1 * f;
+            }
+
+            makeException( Abs( d.x ) > Vector2D::epsilon || Abs( d.y ) > Vector2D::epsilon );
+        }
+        else if( sign > 0 )
+        {
+            u = u0;
+            d = i + u * f;
+        }
+        else if( sign < 0 )
+        {
+            u = u1;
+            d = i + u * f;
+        }
+
+        v = ( p - u * j ) * d / d.Sqr();
+    }
+    else
+    {
+        makeException( Abs( b ) > Vector2D::epsilon );
+
+        auto ij = i * j.L();
+        makeException( Abs( ij ) > Vector2D::epsilon );
+
+        u = -c / b;
+        v = p * j.L() / ij;
+    }
+
+    return Vector2D( u, v );
+}
+
+Vector2D Frame::p( const Vector2D& uv ) const
+{
+    auto& u = uv.x;
+    auto& v = uv.y;
+    return o + u * j + v * i + u * v * f;
+}
+
 Picture::Picture( const Canvas &canvas ) :
     colors( canvas.width(), canvas.height() ), mesh( canvas.width() + 1, canvas.height() + 1 )
 {
@@ -47,7 +124,15 @@ void Picture::apply( const Affine2D &transformation )
     } );
 }
 
-void Picture::apply( const Picture::FunctionConst &f ) const
+void Picture::apply( const Frame& frame0, const Frame& frame1 )
+{
+    mesh.apply( [&frame0, &frame1]( int, int, Vector2D & p )
+    {
+        p = frame1.p( frame0.uv( p ) );
+    } );
+}
+
+void Picture::apply( const Picture::Function &f ) const
 {
     colors.apply( [this, &f]( int j, int i, const Color & color )
     {
@@ -63,6 +148,16 @@ void Picture::apply( const Picture::FunctionConst &f ) const
 void PixelObject::draw( const Color &c, double area )
 {
     overlaping.emplace_back( Overlap{c, area} );
+}
+
+bool PixelObject::fix()
+{
+    auto c = calculate();
+    if( c.valid() )
+        return false;
+
+    clear();
+    return true;
 }
 
 void PixelObject::bake()
@@ -413,12 +508,69 @@ void Canvas::draw( const Affine2D& transform, double width, double height, doubl
     }
 }
 
+void Canvas::draw( const Affine2D& transform, const std::vector<Vector2D>& points, double t, const Color &contour, const Color &fill )
+{
+    auto size = points.size();
+    if( size < 3 )
+        return;
+
+    Vector2D in, out, inNext, outNext, a, b, c;
+    Quadrangle q;
+
+    auto makeEdge = [&]()
+    {
+        auto da = ( a - b ).Normal();
+        auto dc = ( c - b ).Normal();
+
+        auto d = ( da + dc ).Normal();
+        d *= t / d.M( dc );
+
+        inNext = b + d;
+        outNext = b;
+    };
+
+    a = transform( points[size - 1] );
+    b = transform( points[0] );
+    c = transform( points[1] );
+    makeEdge();
+
+    for( size_t i = 1; i <= size; ++i )
+    {
+        in = inNext;
+        out = outNext;
+
+        a = b;
+        b = c;
+        c = transform( points[( i + 1 ) % size] );
+
+        makeEdge();
+
+        q.a[0] = inNext;
+        q.a[1] = in;
+        q.a[2] = out;
+        q.a[3] = outNext;
+
+        draw( q, contour );
+    }
+}
+
 void Canvas::draw( const Picture &picture )
 {
-    picture.apply( [this]( int, int, const Color & color, const Quadrangle & quadrangle )
+    picture.apply( [this]( int, int, Color color, Quadrangle quadrangle )
     {
         draw( quadrangle, color );
     } );
+}
+
+bool Canvas::fix()
+{
+    bool result = false;
+    apply( [&result]( int, int, PixelObject & pixel )
+    {
+        if( pixel.fix() )
+            result = true;
+    } );
+    return result;
 }
 
 void Canvas::bake()

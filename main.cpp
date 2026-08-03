@@ -37,6 +37,8 @@
 #include "tests/Test_30_Flower.h"
 #include "tests/Test_31_Procedural_textures.h"
 #include "tests/Test_32_JustEdit.h"
+#include "tests/Test_33_Count_colors.h"
+#include "tests/Test_34_Digits.h"
 
 #include "tests/Test_X0.h"
 #include "tests/Test_X1.h"
@@ -118,12 +120,17 @@ int main()
         info( L"blacklist" )[2] = L"Test X2";
         info( L"blacklist" )[3] = L"Test X3";
 
+        // info( L"whitelist" )[0] = L"Test 04 image processing";
+        // info( L"whitelist" )[0] = L"Test 05 interactive window";
         // info( L"whitelist" )[0] = L"Test 11 tasks";
         // info( L"whitelist" )[0] = L"Test 22 Polygon";
         // info( L"whitelist" )[0] = L"Test 23 Translate";
         // info( L"whitelist" )[0] = L"Test 27 Mesh";
+        // info( L"whitelist" )[0] = L"Test 28 Tree";
+        // info( L"whitelist" )[0] = L"Test 30 Flower";
         // info( L"whitelist" )[0] = L"Test 31 Procedural textures";
         info( L"whitelist" )[0] = L"Test 32 JustEdit";
+        // info( L"whitelist" )[0] = L"Test 33 Count colors";
 
         Tests tests( console, pause, info );
 
@@ -160,6 +167,8 @@ int main()
         tests( Test_30_Flower );
         tests( Test_31_Procedural_textures );
         tests( Test_32_JustEdit );
+        tests( Test_33_Count_colors );
+        tests( Test_34_Digits );
 
         tests( Test_X0 ); //Ex test10 ???
         tests( Test_X1 ); //Ex test11 ???

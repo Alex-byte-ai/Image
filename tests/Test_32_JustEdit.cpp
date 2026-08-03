@@ -37,10 +37,45 @@ void Test_32_JustEdit( Context &context )
     rectangle.fill = Color( 1, 0.5, 0 );
     rectangle.thickness = 1;
 
+    Overlap::Frame frame0( {8.0, 8.0}, {120, -8.0}, {136.0, 128.0}, {-8.0, 120.0} );
+    Overlap::Frame frame1( {16.0, 0.0}, {112.0, 0.0}, {128.0, 128.0}, {0.0, 128.0} );
+
+    auto isConner = []( int i, int j, int size )
+    {
+        if( i == 0 && j == 0 )
+            return true;
+        if( i == 0 && j == size )
+            return true;
+        if( i == size && j == 0 )
+            return true;
+        if( i == size && j == size )
+            return true;
+        return false;
+    };
+
+    auto isInside = []( const Vector2D & uv )
+    {
+        return 0 <= uv.x && uv.x <= 1 && 0 <= uv.y && uv.y <= 1;
+    };
+
+    for( int i = -40; i <= 40; ++i )
+    {
+        for( int j = -40; j <= 40; ++j )
+        {
+            Vector2D orig( i / 10.0, j / 10.0 );
+            auto p = frame0.p( orig );
+            auto uv0 = frame0.uv( p, -1 );
+            auto uv1 = frame0.uv( p, +1 );
+
+            // auto& circle = *dynamic_cast<JustEdit::Circle*>( root.add( std::make_shared<JustEdit::Circle>( L"dot", p, isConner( i, j, 10 ) ? 8 : 2 ) ) );
+            // circle.fill = Color( isInside( orig ), isInside( uv0 ), isInside( uv1 ) );
+        }
+    }
+
     {
         ImageData image;
-        image.reset( 512, 512 );
-        ImageWindow window( image, nullptr, rootObject );
+        image.reset( 256, 512 );
+        ImageWindow window( image, nullptr, rootObject, ImageWindow::Data( Popup( Popup::Type::Info, L"Test", L"Sample Text." ) ) );
         window.run();
     }
 
@@ -51,39 +86,8 @@ void Test_32_JustEdit( Context &context )
 
     {
         ImageData image;
-        image.reset( 512, 512 );
-        ImageWindow window( image, nullptr, nextRoot );
+        image.reset( 512, 256 );
+        ImageWindow window( image, nullptr, nextRoot, ImageWindow::Data( Popup( Popup::Type::Info, L"Test", L"Sample Text." ) ) );
         window.run();
     }
-
-    auto outputV = [&]( const Vector2D & v )
-    {
-        text << "[" << v.x << "]\n";
-        text << "[" << v.y << "]\n\n";
-    };
-
-    auto outputM = [&]( const Matrix2D & m )
-    {
-        text << "[" << m.a00 << ", " << m.a01 << "]\n";
-        text << "[" << m.a10 << ", " << m.a01 << "]\n\n";
-    };
-
-    double shear = 1.25;
-
-    Matrix2D shearX( 1, shear, 0, 1 );
-    Matrix2D shearY( 1, 0, shear, 1 );
-
-    text << "x:\n\n";
-    outputM( shearX );
-    outputV( shearX * Vector2D( 0, 0 ) );
-    outputV( shearX * Vector2D( 1, 0 ) );
-    outputV( shearX * Vector2D( 1, 1 ) );
-    outputV( shearX * Vector2D( 0, 1 ) );
-
-    text << "y:\n\n";
-    outputM( shearY );
-    outputV( shearY * Vector2D( 0, 0 ) );
-    outputV( shearY * Vector2D( 1, 0 ) );
-    outputV( shearY * Vector2D( 1, 1 ) );
-    outputV( shearY * Vector2D( 0, 1 ) );
 }

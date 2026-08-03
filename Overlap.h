@@ -74,19 +74,31 @@ private:
     E *array;
 };
 
+struct Frame
+{
+    Frame();
+    Frame( const Vector2D& p0, const Vector2D& p1, const Vector2D& p2, const Vector2D& p3 );
+
+    Vector2D uv( const Vector2D& point, short sign = 0 ) const;
+    Vector2D p( const Vector2D& uv ) const;
+
+    Vector2D o, j, i, f;
+};
+
 class Canvas;
 
 class Picture
 {
 public:
-    using FunctionConst = std::function<void( int, int, const Color &c, const Quadrangle &q )>;
+    using Function = std::function<void( int, int, Color c, Quadrangle q )>;
 
     Picture( const Canvas &canvas );
     Picture( const ImageDataBase &picture );
 
     void set( const Affine2D &transformation );
     void apply( const Affine2D &transformation );
-    void apply( const FunctionConst &f ) const;
+    void apply( const Frame& frame0, const Frame& frame1 );
+    void apply( const Function &f ) const;
 private:
     Array2D<Color> colors;
     Array2D<Vector2D> mesh;
@@ -106,6 +118,7 @@ public:
     Color color;
 
     void draw( const Color &color, double area );
+    bool fix();
     void bake();
     Color calculate();
     void clear();
@@ -123,8 +136,10 @@ public:
 
     void draw( const Vector2D& a, const Vector2D& b, double t, const Color &contour );
     void draw( const Affine2D& transform, double w, double h, double t, const Color &contour, const Color &fill );
+    void draw( const Affine2D& transform, const std::vector<Vector2D>& points, double t, const Color &contour, const Color &fill );
     void draw( const Picture &picture );
 
+    bool fix();
     void bake();
     void render( ImageDataBase &out );
     void clear();

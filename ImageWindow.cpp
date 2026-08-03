@@ -9,150 +9,130 @@
 
 #include "ImageData.h"
 
-#include <windows.h>
+std::optional<ImageWindow::Frame> ImageWindow::frame;
+std::optional<ImageWindow::IconData> ImageWindow::iconData;
 
-std::optional<GraphicInterface::Window> ImageWindow::description;
-
-ImageWindow::OutputData::OutputData( GenericWindow::OutputData& original, ImageDataBase &img ) : image( img ), x( original.x ), y( original.y ), popup( original.popup ), quit( original.quit )
-{}
-
-ImageWindow::ImageWindow( ImageDataBase &idb, HandleMsg h, std::shared_ptr<JustEdit::Entity> object, Data initData )
-    : rootObject( std::move( object ) ), data( std::move( initData ) ), handler( std::move( h ) ), image( idb )
+static void fill( GraphicInterface::Node::Parameter& parameter, const JustEdit::Entity& object )
 {
-    updateRoot();
+    parameter.name = object.name;
+    parameter.open = object.hasStructure();
 
-    if( !description )
+    if( parameter.open )
     {
-        description.emplace();
-        auto& desc = *description;
+        auto nodes = object.getNodes();
+        parameter.parameters.resize( nodes.size() );
 
-        std::vector<ImageData> samples;
-        ImageData::readICO( L"image.ico", samples );
-
-        auto isEmpty = []( int i, const auto & img )
+        size_t i = 0;
+        for( auto& p : parameter.parameters )
         {
-            int j = 0;
-            bool empty = true;
-            while( empty && j < img.w() )
-            {
-                empty = img( j, i )->a == 0;
-                ++j;
-            }
-            return empty;
-        };
-
-        int maxHeight = 0;
-        size_t idMax = 0, id = 0;
-        int lowerMax = 0, upperMax = 0;
-        for( const auto &sample : samples )
-        {
-            int realHeight = sample.h();
-
-            int upper = 0;
-            bool empty = true;
-            while( empty && upper < sample.h() )
-            {
-                if( ( empty = isEmpty( upper, sample ) ) )
-                    ++upper;
-            }
-
-            realHeight -= upper;
-
-            int lower = 0;
-            empty = true;
-            while( empty && lower < sample.h() )
-            {
-                if( ( empty = isEmpty( sample.h() - lower - 1, sample ) ) )
-                    ++lower;
-            }
-
-            realHeight -= lower;
-
-            if( realHeight < desc.titlebarHeight && realHeight > maxHeight )
-            {
-                maxHeight = realHeight;
-                lowerMax = lower;
-                upperMax = upper;
-                idMax = id;
-            }
-
-            ++id;
+            fill( p, *nodes[i] );
+            ++i;
         }
-
-        if( maxHeight > 0 )
-        {
-            ImageData icon;
-            samples[idMax].sub( icon, 0, upperMax, samples[idMax].w(), samples[idMax].h() - lowerMax );
-            desc.icon.prepare( icon( 0, 0 ), icon.s(), icon.h() );
-        }
-
-        desc.title.value = title;
-        desc.title.prepare( desc.titleBar.color );
-
-        desc.self.x = -1;
-        desc.self.y = -1;
-
-        desc.content.w = image.w();
-        desc.content.h = image.h();
-
-        desc.self.w = desc.minWidth();
-        desc.self.h = desc.minHeight();
-
-        desc.update();
-    }
-    else
-    {
-        auto& desc = *description;
-
-        desc.title.value = title;
-        desc.title.prepare( desc.titleBar.color );
-
-        desc.update();
     }
 }
 
-ImageWindow::~ImageWindow()
+template<typename F, typename... Args>
+auto make( F&& f, Args&&... args )
+{
+    std::function<void()> function = [fn = std::forward<F>( f ), tup = std::make_tuple( std::forward<Args>( args )... )]()
+    {
+        std::apply( fn, tup );
+    };
+    return function;
+}
+
+ImageWindow::OutputData::OutputData( GraphicInterface::OutputData& original, ImageDataBase &img ) : image( img ), x( original.x ), y( original.y ), quit( original.quit )
 {}
 
-void ImageWindow::run()
+ImageWindow::ImageWindow( ImageDataBase &idb, HandleMsg hnd, std::shared_ptr<JustEdit::Entity> object, Data initData )
+    : rootObject( std::move( object ) ), data( std::move( initData ) ), handler( std::move( hnd ) ), image( idb )
 {
-    GenericWindow::HandleMsg outerHandler;
+    updateRoot();
+
+    if( !frame )
+        frame.emplace();
+    auto& f = *frame;
+
+    auto& desc = description.emplace();
+
+    prepareIcon( desc );
+
+    desc.title.value = title;
+    desc.title.prepare();
+
+    desc.x = f.x;
+    desc.y = f.y;
+    desc.self.w = f.w;
+    desc.self.h = f.h;
+
+    desc.content.w = image.w();
+    desc.content.h = image.h();
+}
+
+ImageWindow::~ImageWindow()
+{
+    if( frame && description )
+    {
+        auto& desc = *description;
+        auto& f = *frame;
+
+        f.x = desc.x;
+        f.y = desc.y;
+        f.w = desc.self.w;
+        f.h = desc.self.h;
+    }
+}
+
+bool ImageWindow::run( bool lock )
+{
+    GraphicInterface::HandleMsg outerHandler;
 
     if( !rootObject )
     {
-        outerHandler = [this, callback = handler]( const GenericWindow::InputData & input, GenericWindow::OutputData & output )
+        outerHandler = [this, callback = handler]( const GraphicInterface::InputData & input, GraphicInterface::OutputData & output )
         {
             if( input.escape.changed() && *input.escape )
             {
                 output.quit = true;
-                return;
+                return true;
             }
 
             OutputData outputData( output, image );
 
+            bool response = false;
             if( callback )
-                callback( input, outputData );
+                response = callback( input, outputData );
 
             if( input.init || outputData.image.changed() )
             {
                 output.image.get().prepare( image( 0, 0 ), image.s(), image.h() );
+                return true;
             }
 
-            if( input.space.changed() && *input.space )
+            if( !response )
             {
-                image.output();
+                if( input.space.changed() && *input.space )
+                {
+                    image.output();
+                    return true;
+                }
+
+                if( input.f1.changed() && *input.f1 )
+                {
+                    if( data.help )
+                    {
+                        data.help->run();
+                        return true;
+                    }
+                }
             }
 
-            if( input.f1.changed() && *input.f1 )
-            {
-                if( data.help )
-                    data.help->run();
-            }
+            return response;
         };
     }
     else
     {
-        outerHandler = [this]( const GenericWindow::InputData & input, GenericWindow::OutputData & output )
+        outerHandler = [this]( const GraphicInterface::InputData & input, GraphicInterface::OutputData & output )
         {
             auto getFreeName = [this]( const std::wstring & prefix )
             {
@@ -163,7 +143,7 @@ void ImageWindow::run()
                 {
                     if( s->name.length() == length && s->name.substr( 0, prefix.length() ) == prefix )
                     {
-                        if( s->name.substr( 0, prefix.length() ) == freeIdString )
+                        if( s->name.substr( prefix.length() ) == freeIdString )
                         {
                             ++freeId;
                             freeIdString = std::to_wstring( freeId );
@@ -177,7 +157,7 @@ void ImageWindow::run()
                 return prefix + freeIdString;
             };
 
-            auto update = [&]()
+            auto update = [this, &output]()
             {
                 image.function( image, []( int, int, int j, int i, Pixel, Pixel & out )
                 {
@@ -192,15 +172,13 @@ void ImageWindow::run()
                 output.image.get().prepare( image( 0, 0 ), image.s(), image.h() );
             };
 
-            auto focusCamera = [&]( const Vector2D & topLeft, const Vector2D & bottomRight, double baseScale = 1.0 )
+            auto focusCamera = [this, update]( const Vector2D & topLeft, const Vector2D & bottomRight, double baseScale = 1.0 )
             {
                 int w = image.w();
                 int h = image.h();
-                double imageW = Round( baseScale * w );
-                double imageH = Round( baseScale * h );
 
-                auto sx = imageW / ( bottomRight.x - topLeft.x );
-                auto sy = imageH / ( bottomRight.y - topLeft.y );
+                auto sx = baseScale * w / ( bottomRight.x - topLeft.x );
+                auto sy = baseScale * h / ( bottomRight.y - topLeft.y );
 
                 if( sx > 16 )
                     sx = 16;
@@ -214,84 +192,140 @@ void ImageWindow::run()
 
                 if( sx > 1 )
                     sx = RoundDown( sx );
+                else if( sx < 1 )
+                    sx = 1 / RoundDown( 1 / sx );
 
                 if( sy > 1 )
                     sy = RoundDown( sy );
+                else if( sy < 1 )
+                    sy = 1 / RoundDown( 1 / sy );
 
                 auto scale = Min( sx, sy );
 
-                imageW = scale * ( bottomRight.x - topLeft.x );
-                imageH = scale * ( bottomRight.y - topLeft.y );
-
                 camera = Affine2D( Vector2D( w * 0.5, h * 0.5 ) ) * Affine2D( Matrix2D::Scale( scale ) ) * Affine2D( -( topLeft + bottomRight ) * 0.5 );
+
                 update();
             };
 
-            auto fitCamera = [&]()
+            auto fitCamera = [this, focusCamera]()
             {
                 Vector2D topLeft, bottomRight;
                 if( root->size( Affine2D( Vector2D() ), topLeft, bottomRight ) )
-                    focusCamera( topLeft, bottomRight, 0.65 );
+                    focusCamera( topLeft, bottomRight, 0.8 );
             };
 
-            auto edit = [&]( JustEdit::Entity * target )
+            auto minimizeAll = [this, fitCamera]()
+            {
+                selection->select( nullptr, false );
+                root = rootObject.get();
+                selection->setRoot( root );
+
+                ( *rootObject )( []( JustEdit::Entity * o )
+                {
+                    o->dumpStructure();
+                    return true;
+                } );
+
+                fitCamera();
+            };
+
+            auto edit = [this, update]( JustEdit::Entity * target )
             {
                 Settings::Parameters parameters;
                 for( auto& [name, set, get, options] : target->editData() )
                     parameters.emplace_back( name, set, get, options );
 
-                Settings settings( target->description(), parameters );
-                settings.run();
-
-                update();
+                auto& s = settings.emplace( target->description(), parameters );
+                s.onClose = [this, update]()
+                {
+                    selection->update();
+                    update();
+                };
+                s.run();
             };
 
-            auto create = [&]( Vector2D p, int itemId )
+            auto add = [this]( std::shared_ptr<JustEdit::Entity> entity )
+            {
+                if( hierarchy )
+                {
+                    auto& r = hierarchy->root;
+                    r.addNode( std::make_shared<GraphicInterface::Node>( r.data, entity->name ) );
+                }
+                selection->select( root->add( std::move( entity ) ), false );
+            };
+
+            auto remove = [this]( JustEdit::Entity * entity )
+            {
+                if( hierarchy )
+                {
+                    auto object = hierarchy->root.getObject( entity->getPath() );
+                    if( object )
+                        object->detach();
+                }
+                auto result = entity->detach();
+                selection->select( nullptr, false );
+                return result;
+            };
+
+            auto create = [this, getFreeName, add, update]( Vector2D p, int itemId, bool test )
             {
                 using namespace JustEdit;
+
+                if( !root->hasStructure() )
+                    return false;
+                if( test )
+                    return true;
 
                 p = camera.inv()( p );
 
                 if( itemId == 0 )
                 {
-                    selection->select( root->add( std::make_shared<JustEdit::Raster>( getFreeName( L"raster" ), 64, 64, Position( p ) ) ), false );
+                    add( std::make_shared<JustEdit::Raster>( getFreeName( L"raster" ), 64, 64, Position( p ) ) );
                 }
                 else if( itemId == 1 )
                 {
-                    selection->select( root->add( std::make_shared<JustEdit::Line>( getFreeName( L"line" ), p, p + Vector2D( 32, 32 ) ) ), false );
+                    add( std::make_shared<JustEdit::Line>( getFreeName( L"line" ), p, p + Vector2D( 32, 32 ) ) );
                 }
                 else if( itemId == 2 )
                 {
-                    selection->select( root->add( std::make_shared<JustEdit::Rectangle>( getFreeName( L"rectangle" ), 32, 16, Position( p ) ) ), false );
+                    add( std::make_shared<JustEdit::Rectangle>( getFreeName( L"rectangle" ), 32, 16, Position( p ) ) );
                 }
                 else if( itemId == 3 )
                 {
-                    selection->select( root->add( std::make_shared<JustEdit::Circle>( getFreeName( L"circle" ), p, 24 ) ), false );
+                    add( std::make_shared<JustEdit::Circle>( getFreeName( L"circle" ), p, 24 ) );
                 }
                 else if( itemId == 4 )
                 {
-                    selection->select( root->add( std::make_shared<JustEdit::Text>( getFreeName( L"text" ), L"Lorem ipsum", Position( p ) ) ), false );
+                    add( std::make_shared<JustEdit::Text>( getFreeName( L"text" ), L"Lorem ipsum", Position( p ) ) );
                 }
                 else if( itemId == 5 )
                 {
-                    selection->select( root->add( std::make_shared<JustEdit::Polygon>( getFreeName( L"polygon" ), Position( p ) ) ), false );
+                    add( std::make_shared<JustEdit::Polygon>( getFreeName( L"polygon" ), Position( p ) ) );
                 }
                 else if( itemId == 6 )
                 {
-                    selection->select( root->add( std::make_shared<JustEdit::Point>( getFreeName( L"point" ), 0, p ) ), false );
+                    add( std::make_shared<JustEdit::Point>( getFreeName( L"point" ), 1, p ) );
                 }
 
                 update();
+                return true;
             };
 
             static uint16_t toolId = 0;
             static std::optional<Vector2D> initialCanvasGrab;
-            auto pickTool = [&]( uint16_t id )
+            auto pickTool = []( uint16_t id, bool test )
             {
+                if( initialCanvasGrab )
+                    return false;
+
+                if( test )
+                    return true;
+
                 toolId = id;
+                return true;
             };
 
-            auto modify = [&]( JustEdit::Entity * target, int modificationId, bool test )
+            auto modify = [this, getFreeName, add, remove, update]( JustEdit::Entity * target, int modificationId, bool test )
             {
                 if( !target || target == root || target->type() != L"Raster" )
                     return false;
@@ -302,7 +336,9 @@ void ImageWindow::run()
                 if( modificationId == 0 )
                 {
                     auto targetRoot = target->getRoot();
-                    selection->select( targetRoot->add( std::make_shared<JustEdit::Perspective>( getFreeName( L"perspective" ), target, target->position ) ), false );
+                    std::swap( root, targetRoot );
+                    add( std::make_shared<JustEdit::Perspective>( getFreeName( L"perspective" ), remove( target ), target->position ) );
+                    std::swap( root, targetRoot );
                     target->position = JustEdit::Position();
                     update();
                 }
@@ -310,7 +346,7 @@ void ImageWindow::run()
                 return true;
             };
 
-            auto deletef = [&]( const std::vector<JustEdit::Entity*>& targets, bool test )
+            auto deletef = [this, remove, update]( const std::vector<JustEdit::Entity*>& targets, bool test )
             {
                 if( targets.empty() )
                     return false;
@@ -335,13 +371,13 @@ void ImageWindow::run()
                 selection->select( nullptr, false );
 
                 for( auto target : targets )
-                    target->detach();
+                    remove( target );
 
                 update();
                 return true;
             };
 
-            auto group = [&]( bool f, bool test )
+            auto group = [this, add, remove, update]( bool f, bool test )
             {
                 if( f )
                 {
@@ -359,10 +395,10 @@ void ImageWindow::run()
                     for( auto target : nodes )
                     {
                         if( std::find( targets.begin(), targets.end(), target ) != targets.end() )
-                            g->add( target->detach() );
+                            g->add( remove( target ) );
                     }
+                    add( g );
 
-                    root->add( g );
                     update();
                     return true;
                 }
@@ -383,42 +419,38 @@ void ImageWindow::run()
                 for( auto node : nodes )
                 {
                     node->position( g->position() * node->position() );
-                    root->add( node->detach() );
+                    add( remove( node ) );
                 }
 
-                g->detach();
+                remove( g );
                 update();
                 return true;
             };
 
-            auto open = [&]()
+            auto open = [this, update]()
             {
-                auto newRoot = JustEdit::Entity::load();
-                if( newRoot )
+                JustEdit::Entity::load( [this, update]( auto & newRoot )
                 {
-                    rootObject = newRoot;
-                    updateRoot();
-                    update();
-                }
-                else
-                {
-                    Popup( Popup::Type::Error, L"Loading", L"File can't be loaded." ).run();
-                }
+                    if( newRoot )
+                    {
+                        rootObject = newRoot;
+                        updateRoot();
+                        update();
+                    }
+                    else
+                    {
+                        popup.emplace( Popup::Type::Warning, L"Loading", L"File can't be loaded." ).run();
+                    }
+                } );
             };
 
-            auto save = [&]()
+            auto save = [this, minimizeAll]()
             {
-                auto mainRoot = root;
-                auto next = mainRoot->getRoot();
-                while( next )
-                {
-                    mainRoot = next;
-                    next = next->getRoot();
-                }
-                mainRoot->save();
+                minimizeAll();
+                rootObject->save();
             };
 
-            auto import = [&]( const Vector2D & p )
+            auto import = [this, getFreeName, add, update]( const Vector2D & p )
             {
                 auto raster = std::make_shared<JustEdit::Raster>( getFreeName( L"import" ), 64, 64, JustEdit::Position( camera.inv()( p ) ) );
 
@@ -429,16 +461,17 @@ void ImageWindow::run()
                 raster->position.scaleX = 64.0 / raster->w;
                 raster->position.scaleY = 64.0 / raster->h;
 
-                root->add( raster );
-                selection->select( raster.get(), false );
+                add( raster );
                 update();
             };
 
-            auto exportf = [&]()
+            auto exportf = [this, minimizeAll]()
             {
                 Vector2D topLeft, bottomRight;
                 if( root->size( Affine2D( Vector2D() ), topLeft, bottomRight ) )
                 {
+                    minimizeAll();
+
                     int w = RoundUp( bottomRight.x - topLeft.x );
                     int h = RoundUp( bottomRight.y - topLeft.y );
 
@@ -452,12 +485,12 @@ void ImageWindow::run()
                 }
             };
 
-            auto undo = [&]( bool f )
+            auto undo = [this]( bool f )
             {
-                Popup( Popup::Type::Info, L"Change buffer", f ? L"Undone is not implemented" : L"Redone is not implemented" ).run();
+                popup.emplace( Popup::Type::Info, L"Change buffer", f ? L"Undone is not implemented" : L"Redone is not implemented" ).run();
             };
 
-            auto view = [&]( JustEdit::Entity * target, bool test )
+            auto view = [this, fitCamera]( JustEdit::Entity * target, bool test )
             {
                 if( target )
                 {
@@ -466,9 +499,15 @@ void ImageWindow::run()
                     {
                         if( test )
                             return true;
+
+                        if( !target->hasStructure() && !target->establishStructure() )
+                            return false;
+
                         selection->select( nullptr, false );
+
                         root = target;
-                        target->establishStructure();
+                        selection->setRoot( root );
+
                         fitCamera();
                         return true;
                     }
@@ -477,28 +516,124 @@ void ImageWindow::run()
                 }
 
                 auto newRoot = root->getRoot();
-                if( newRoot )
-                {
-                    if( test )
-                        return true;
-                    selection->select( newRoot, false );
-                    root->dumpStructure();
-                    root = newRoot;
-                    fitCamera();
+
+                if( test )
                     return true;
-                }
 
-                return false;
+                if( root->hasStructure() && !root->dumpStructure() )
+                    return false;
+
+                selection->select( nullptr, false );
+
+                root = newRoot ? newRoot : root;
+                selection->setRoot( root );
+
+                fitCamera();
+                return true;
             };
 
-            auto help = [&]()
+            auto help = [this]()
             {
-                Popup( Popup::Type::Info, L"Help", L"Some information..." ).run();
+                popup.emplace( Popup::Type::Info, L"Help", L"Some information..." ).run();
             };
 
-            auto exit = [&]()
+            auto exit = [&output]()
             {
                 output.quit = true;
+            };
+
+            auto openHierarchy = [this, update]()
+            {
+                if( hierarchy )
+                    return;
+
+                GraphicInterface::Node::Parameter parameter;
+                fill( parameter, *rootObject );
+
+                auto& h = hierarchy.emplace( parameter );
+
+                h.title.value = L"Scene tree";
+                h.title.prepare();
+
+                h.callback = [this, &h, o = rootObject.get(), update]( const GraphicInterface::Node::ActionData & d )
+                {
+                    JustEdit::Entity *primary = nullptr;
+
+                    if( d.path )
+                        primary = o->getObject( *d.path );
+
+                    if( !primary )
+                        return false;
+
+                    auto sync = [&]()
+                    {
+                        GraphicInterface::Node::Parameter p;
+                        fill( p, *primary );
+
+                        auto node = h.root.getObject( *d.path );
+                        node->update( p );
+                    };
+
+                    if( d.action == GraphicInterface::Node::Action::Move )
+                    {
+                        JustEdit::Entity *secondaryRoot = nullptr, *primaryRoot = nullptr;
+                        size_t secondaryId = -1;
+
+                        primaryRoot = o->getObject( *d.path, 1 );
+
+                        if( d.secondary )
+                        {
+                            secondaryId = d.secondary->front();
+                            secondaryRoot = o->getObject( *d.secondary, 1 );
+                        }
+
+                        if( !secondaryRoot )
+                            return false;
+
+                        if( secondaryRoot == primaryRoot && secondaryId > primary->getId() )
+                            --secondaryId;
+
+                        auto node = primary->detach();
+                        if( !node )
+                            return false;
+
+                        if( !secondaryRoot->add( node, secondaryId ) )
+                            return false;
+
+                        selection->select( nullptr, false );
+                        update();
+                        return true;
+                    }
+
+                    if( d.action == GraphicInterface::Node::Action::Open )
+                    {
+                        if( !primary->establishStructure() )
+                            return false;
+                        selection->select( nullptr, false );
+                        sync();
+                        update();
+                        return true;
+                    }
+
+                    if( d.action == GraphicInterface::Node::Action::Close )
+                    {
+                        if( !primary->dumpStructure() )
+                            return false;
+                        selection->select( nullptr, false );
+                        sync();
+                        update();
+                        return true;
+                    }
+
+                    return false;
+                };
+
+                h.onClose = [this]()
+                {
+                    hierarchy.reset();
+                };
+
+                h.run( false );
             };
 
             auto keyDown = [&]( char symbol )
@@ -509,46 +644,58 @@ void ImageWindow::run()
 
             if( input.init )
             {
-                int w = RoundUp( GetSystemMetrics( SM_CXSCREEN ) * 0.65 );
-                int h = RoundUp( GetSystemMetrics( SM_CYSCREEN ) * 0.65 );
-
-                if( w % 2 == 0 )
-                    --w;
-
-                if( h % 2 == 0 )
-                    --h;
-
-                image.reset( w, h );
-
-                fitCamera();
+                Vector2D topLeft, bottomRight;
+                if( rootObject->size( Affine2D( Vector2D() ), topLeft, bottomRight ) )
+                {
+                    auto size = bottomRight - topLeft;
+                    image.reset( Round( size.x / 0.8 ), Round( size.y / 0.8 ) );
+                    fitCamera();
+                }
+                openHierarchy();
+                return true;
             }
 
             if( *input.ctrl && keyDown( 'G' ) )
+            {
                 group( true, false );
+                return true;
+            }
 
             if( *input.ctrl && keyDown( 'U' ) )
+            {
                 group( false, false );
+                return true;
+            }
 
             if( *input.ctrl && keyDown( 'O' ) )
+            {
                 open();
+                return true;
+            }
 
             if( *input.ctrl && keyDown( 'S' ) )
+            {
                 save();
+                return true;
+            }
 
             if( *input.ctrl && *input.up && input.up.changed() )
             {
                 if( auto target = selection->getTarget() )
                     view( target, false );
+                return true;
             }
 
             if( *input.ctrl && *input.down && input.down.changed() )
             {
                 view( nullptr, false );
+                return true;
             }
 
             if( *input.del && input.del.changed() )
             {
                 deletef( selection->getTargets(), false );
+                return true;
             }
 
             static uint16_t forcedOutTool = 0;
@@ -556,10 +703,14 @@ void ImageWindow::run()
             {
                 forcedOutTool = toolId;
                 toolId = 2;
+                return true;
             }
 
             if( input.space.changed() && !*input.space )
+            {
                 toolId = forcedOutTool;
+                return true;
+            }
 
             bool lmb = input.leftMouse.changed() && *input.leftMouse;
             bool rmb = input.rightMouse.changed() && *input.rightMouse;
@@ -567,7 +718,7 @@ void ImageWindow::run()
             if( lmb || rmb )
             {
                 Vector2D point( *input.mouseX, *input.mouseY );
-                auto target = root->pointsTo( camera, point, JustEdit::SelectionMode::Part );
+                auto target = root->pointsTo( camera, point );
 
                 bool isSelection = false;
 
@@ -575,16 +726,13 @@ void ImageWindow::run()
                 {
                     if( toolId == 0 )
                     {
-                        if( selection->grab( camera, point ) )
+                        if( target != root && selection->grab( camera, point ) )
                         {
                             isSelection = true;
                         }
                         else
                         {
-                            if( target != root )
-                                selection->select( target, *input.ctrl );
-                            else
-                                selection->select( nullptr, *input.ctrl );
+                            selection->select( target, *input.ctrl );
                             update();
                         }
                     }
@@ -603,57 +751,30 @@ void ImageWindow::run()
 
                 if( rmb )
                 {
-                    auto make = []( const auto & f, const auto & arg )
-                    {
-                        std::function<void()> function = [f, arg]()
-                        {
-                            f( arg );
-                        };
-                        return function;
-                    };
-
-                    auto make2 = []( const auto & f, const auto & arg0, const auto & arg1 )
-                    {
-                        std::function<void()> function = [f, arg0, arg1]()
-                        {
-                            f( arg0, arg1 );
-                        };
-                        return function;
-                    };
-
-                    auto make3 = []( const auto & f, const auto & arg0, const auto & arg1, const auto & arg2 )
-                    {
-                        std::function<void()> function = [f, arg0, arg1, arg2]()
-                        {
-                            f( arg0, arg1, arg2 );
-                        };
-                        return function;
-                    };
-
-                    ContextMenu menu(
+                    menu.emplace( ContextMenu::Parameters
                     {
                         {L"Edit", !isSelection && target, make( edit, target )},
                         {},
                         {
                             L"Tools", true, {},
                             {
-                                {L"Select", !initialCanvasGrab, make( pickTool, 0 )},
-                                {L"Pixel drawing", !initialCanvasGrab, make( pickTool, 1 )},
-                                {L"Move canvas (Hold Space)", !initialCanvasGrab, make( pickTool, 2 )},
-                                {L"Zoom (Mouse / Ctrl+(+ / -))", !initialCanvasGrab, make( pickTool, 3 )},
+                                {L"Select", pickTool( 0, true ), make( pickTool, 0, false )},
+                                {L"Pixel drawing", pickTool( 1, true ), make( pickTool, 1, false )},
+                                {L"Move canvas (Hold Space)", pickTool( 2, true ), make( pickTool, 2, false )},
+                                {L"Zoom (Mouse / Ctrl+(+ / -))", pickTool( 3, true ), make( pickTool, 3, false )},
                             }
                         },
                         {},
                         {
                             L"Create", true, {},
                             {
-                                {L"Raster", true, make2( create, point, 0 )},
-                                {L"Line", true, make2( create, point, 1 )},
-                                {L"Rectangle", true, make2( create, point, 2 )},
-                                {L"Circle", true, make2( create, point, 3 )},
-                                {L"Text", true, make2( create, point, 4 )},
-                                {L"Polygon", true, make2( create, point, 5 )},
-                                {L"Point", dynamic_cast<JustEdit::Polygon*>( root ) != nullptr, make2( create, point, 6 )}
+                                {L"Raster", create( point, 0, true ), make( create, point, 0, false )},
+                                {L"Line", create( point, 1, true ), make( create, point, 1, false )},
+                                {L"Rectangle", create( point, 2, true ), make( create, point, 2, false )},
+                                {L"Circle", create( point, 3, true ), make( create, point, 3, false )},
+                                {L"Text", create( point, 4, true ), make( create, point, 4, false )},
+                                {L"Polygon", create( point, 5, true ), make( create, point, 5, false )},
+                                {L"Point", create( point, 6, true ), make( create, point, 6, false )}
                             }
                         },
                         {
@@ -662,20 +783,22 @@ void ImageWindow::run()
                                 {
                                     L"Transform", true, {},
                                     {
-                                        {L"Perspective", modify( target, 0, true ), make3( modify, target, 0, false )}
+                                        {L"Perspective", modify( target, 0, true ), make( modify, target, 0, false )}
                                     }
                                 }
                             }
                         },
-                        { L"Delete (Del)", !isSelection && deletef( { target }, true ), make2( deletef, std::vector<JustEdit::Entity*>{ target }, false ) },
+                        { L"Delete (Del)", !isSelection && deletef( { target }, true ), make( deletef, std::vector<JustEdit::Entity*>{ target }, false ) },
                         {},
-                        { L"Group (ctrl+G)", group( true, true ), make2( group, true, false ) },
-                        { L"Ungroup (ctrl+U)", group( false, true ), make2( group, false, false ) },
+                        { L"Group (ctrl+G)", group( true, true ), make( group, true, false ) },
+                        { L"Ungroup (ctrl+U)", group( false, true ), make( group, false, false ) },
                         {},
                         { L"Copy (ctrl+C)", false },
                         { L"Cut (ctrl+X)", false },
                         { L"Paste (ctrl+V)", false },
                         { L"Place (ctrl+alt+V)", false },
+                        {},
+                        {L"Scene tree", true, openHierarchy},
                         {},
                         {L"Open (ctrl+O)", true, open},
                         {L"Save (ctrl+S)", true, save},
@@ -686,15 +809,16 @@ void ImageWindow::run()
                         {L"Undo last change (ctrl+Z)", true, make( undo, true )},
                         {L"Redo last change (ctrl+Y)", true, make( undo, false )},
                         {},
-                        {L"View structure (ctrl+↑)", target && view( target, true ), make2( view, target, false )},
-                        {L"Return (ctrl+↓)", view( nullptr, true ), make2( view, nullptr, false )},
+                        {L"Hide others (ctrl+↑)", target && view( target, true ), make( view, target, false )},
+                        {L"Show previously hidden (ctrl+↓)", view( nullptr, true ), make( view, nullptr, false )},
                         {},
                         {L"Help", true, help},
                         {},
                         {L"Exit", true, exit}
-                    } );
-                    menu.run();
+                    } ).run();
                 }
+
+                return true;
             }
 
             if( input.mouseX.changed() || input.mouseY.changed() )
@@ -703,11 +827,13 @@ void ImageWindow::run()
                 {
                     if( selection->move( camera, Vector2D( *input.mouseX, *input.mouseY ) ) )
                         update();
+                    return true;
                 }
-                else if( toolId == 2 && initialCanvasGrab )
+                if( toolId == 2 && initialCanvasGrab )
                 {
                     camera.s = *initialCanvasGrab + Vector2D( *input.mouseX, *input.mouseY );
                     update();
+                    return true;
                 }
             }
 
@@ -722,13 +848,93 @@ void ImageWindow::run()
                     focusCamera( leftTop, bottomRight );
                 }
                 initialCanvasGrab.reset();
+                return true;
             }
+
+            return false;
         };
     }
 
     makeException( description );
-    GenericWindow self( *description, outerHandler );
-    self.run();
+    description->handleMsg = outerHandler;
+    return description->run( lock );
+}
+
+void ImageWindow::prepareIcon( GraphicInterface::Window& desc )
+{
+    if( iconData )
+    {
+        auto& ico = *iconData;
+        desc.icon.bufferW = desc.icon.w = ico.w;
+        desc.icon.bufferH = desc.icon.h = ico.h;
+        desc.icon.pixels = ico.image;
+        return;
+    }
+
+    std::vector<ImageData> samples;
+    ImageData::readICO( L"image.ico", samples );
+
+    auto isEmpty = []( int i, const auto & img )
+    {
+        int j = 0;
+        bool empty = true;
+        while( empty && j < img.w() )
+        {
+            empty = img( j, i )->a == 0;
+            ++j;
+        }
+        return empty;
+    };
+
+    int maxHeight = 0;
+    size_t idMax = 0, id = 0;
+    int lowerMax = 0, upperMax = 0;
+    for( const auto &sample : samples )
+    {
+        int realHeight = sample.h();
+
+        int upper = 0;
+        bool empty = true;
+        while( empty && upper < sample.h() )
+        {
+            if( ( empty = isEmpty( upper, sample ) ) )
+                ++upper;
+        }
+
+        realHeight -= upper;
+
+        int lower = 0;
+        empty = true;
+        while( empty && lower < sample.h() )
+        {
+            if( ( empty = isEmpty( sample.h() - lower - 1, sample ) ) )
+                ++lower;
+        }
+
+        realHeight -= lower;
+
+        if( realHeight < desc.titlebarHeight && realHeight > maxHeight )
+        {
+            maxHeight = realHeight;
+            lowerMax = lower;
+            upperMax = upper;
+            idMax = id;
+        }
+
+        ++id;
+    }
+
+    if( maxHeight > 0 )
+    {
+        ImageData icon;
+        samples[idMax].sub( icon, 0, upperMax, samples[idMax].w(), samples[idMax].h() - lowerMax );
+        desc.icon.prepare( icon( 0, 0 ), icon.s(), icon.h() );
+
+        auto& ico = iconData.emplace();
+        ico.w = desc.icon.bufferW;
+        ico.h = desc.icon.bufferH;
+        ico.image = desc.icon.pixels;
+    }
 }
 
 void ImageWindow::updateRoot()

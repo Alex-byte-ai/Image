@@ -15,7 +15,11 @@ void Test_X2( Context &context )
     std::filesystem::path path0, path1;
     ImageData in, out;
 
-    auto p = openPath();
+    std::optional<std::filesystem::path> p;
+    openPath( [&p]( const auto & path )
+    {
+        p = path;
+    } );
     if( !p.has_value() )
         return;
 

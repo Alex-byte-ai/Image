@@ -68,7 +68,7 @@ double Core::distance2( const Core &other ) const
     return Sqrt( mdr * mdr + mdg * mdg + mdb * mdb ) / 255;
 }
 
-void ManualPicks( const ImageWindow::InputData &inputData, ImageWindow::OutputData & )
+bool ManualPicks( const ImageWindow::InputData &inputData, ImageWindow::OutputData & )
 {
     Core next;
     if( inputData.leftMouse.changed() && *inputData.leftMouse )
@@ -78,7 +78,10 @@ void ManualPicks( const ImageWindow::InputData &inputData, ImageWindow::OutputDa
         next.i = *inputData.mouseY;
         next.c = *( *cores.image )( next.j, next.i );
         cores.cores.push_back( next );
+        return true;
     }
+
+    return false;
 }
 
 bool LimitPalette( const ImageData &in, ImageData &out, double size )

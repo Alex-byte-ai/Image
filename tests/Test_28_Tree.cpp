@@ -1,10 +1,10 @@
 #include "Test_28_Tree.h"
 
 #include "RandomNumber.h"
+#include "Line.h"
 
 #include "../ImageData.h"
 #include "../GetImage.h"
-#include "../Line.h"
 
 class Painter
 {

@@ -252,6 +252,8 @@ void Test_13_rotating_image( Context &context )
     bool canRotate = false;
     Vector2D shift;
 
+    Popup question( Popup::Type::Question, L"Editor", L"Do you want to remove created circles?" );
+
     auto spin = [&]( const ImageWindow::InputData & inputData, ImageWindow::OutputData & outputData )
     {
         auto drawCircle = [&]( bool mouseCoordinates )
@@ -349,18 +351,22 @@ void Test_13_rotating_image( Context &context )
                 text << L"Press A to rotate an image, press S to start over\n\n";
                 turn();
             }
+            return true;
         }
 
         if( keyDown( 'S' ) )
         {
-            Popup question( Popup::Type::Question, L"Editor", L"Do you want to remove created circles?" );
-            question.run();
-            if( question.answer && *question.answer )
-                newFrame();
+            question.onClose = [&]()
+            {
+                if( question.answer && *question.answer )
+                    newFrame();
 
-            actionId = 0;
-            base.copy( outputData.image.get() );
-            time = 0;
+                actionId = 0;
+                base.copy( outputData.image.get() );
+                time = 0;
+            };
+            question.run();
+            return true;
         }
 
         if( keyDown( 'T' ) )
@@ -369,17 +375,20 @@ void Test_13_rotating_image( Context &context )
             if( !frame->read( path ) )
                 frame->write( path );
             time = 0;
+            return true;
         }
 
         if( keyDown( 'I' ) )
         {
             trick = ( trick + 1 ) % 7;
             time = 0;
+            return true;
         }
 
         if( ( actionId == 1 ) && ( inputData.mouseX.changed() || inputData.mouseY.changed() ) )
         {
             drawCircle( true );
+            return true;
         }
 
         auto &keyZ = inputData.keys.letter( 'Z' );
@@ -397,6 +406,7 @@ void Test_13_rotating_image( Context &context )
             if( y )
                 ry += delta;
             drawCircle( true );
+            return true;
         }
 
         if( ( actionId == 1 ) && !canRotate && inputData.rightMouse.changed() && *inputData.rightMouse )
@@ -414,6 +424,7 @@ void Test_13_rotating_image( Context &context )
             if( ry < 0 )
                 ry = 0;
             drawCircle( true );
+            return true;
         }
 
         if( writeDisk && outputVariableData && ( actionId == 2 ) &&  keyDown( 'L' ) )
@@ -436,7 +447,10 @@ void Test_13_rotating_image( Context &context )
                     outputData.image->output( context.Output() / ( id + L".png" ) );
                 }
             }
+            return true;
         }
+
+        return false;
     };
 
     if( showImages )

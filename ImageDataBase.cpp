@@ -22,6 +22,15 @@ bool Pixel::operator!=( Pixel other ) const
     return ( r != other.r ) || ( g != other.g ) || ( b != other.b ) || ( a != other.a );
 }
 
+bool Pixel::operator<( Pixel other ) const
+{
+    return
+        ( a < other.a ) ||
+        ( ( a == other.a ) && ( r < other.r ) ) ||
+        ( ( a == other.a ) && ( r == other.r ) && ( g < other.g ) ) ||
+        ( ( a == other.a ) && ( r == other.r ) && ( g == other.g ) && ( b < other.b ) );
+}
+
 Pixel Pixel::invert() const
 {
     return Pixel( 255 - r, 255 - g, 255 - b, a );

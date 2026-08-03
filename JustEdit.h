@@ -21,22 +21,17 @@ public:
     void operator()( const Affine2D& p );
 };
 
-enum class SelectionMode
-{
-    Group,
-    Part,
-    Object
-};
-
 struct SerializationDescription;
-using EditData = std::vector<std::tuple<std::wstring, std::function<bool( const std::wstring& )>, std::function<std::wstring()>>>;
+using EditData = std::vector <std::tuple <std::wstring, std::function<bool( const std::wstring& )>, std::function<std::wstring()>, std::vector<std::wstring>>>;
 using DeserializationData = std::vector<std::tuple<std::wstring, std::any>>;
 
 class Entity
 {
 protected:
     std::vector<std::shared_ptr<Entity>> nodes;
+    bool structure;
     Entity *root;
+    size_t id;
 
 public:
     Color contour, fill;
@@ -51,11 +46,18 @@ public:
     std::wstring description() const;
 
     Entity *add( std::shared_ptr<Entity> node );
-    std::shared_ptr<Entity> remove( const Entity* node );
+    Entity *add( std::shared_ptr<Entity> node, size_t id );
+
     std::shared_ptr<Entity> detach();
+
+    std::vector<size_t> getPath() const;
+    Entity *getObject( const std::vector<size_t>& path, size_t skip = 0 );
+
+    size_t getId() const;
 
     std::vector<const Entity*> getNodes() const;
     std::vector<Entity*> getNodes();
+
     const Entity *getRoot() const;
     Entity *getRoot();
 
@@ -65,12 +67,12 @@ public:
     bool save( const std::filesystem::path& path ) const;
     static std::shared_ptr<Entity> load( const std::filesystem::path& path );
 
-    bool save() const;
-    static std::shared_ptr<Entity> load();
+    void save( bool *success = nullptr ) const;
+    static void load( std::function<void( std::shared_ptr<Entity>& )> callback );
 
-    Affine2D globalPosition( const Entity* root ) const;
+    Affine2D globalPosition( const Entity* level ) const;
 
-    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode mode ) = 0;
+    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point ) = 0;
 
     virtual bool draw( const Affine2D& transform, Overlap::Canvas& canvas ) const = 0;
     virtual bool size( const Affine2D& transform, Vector2D& topLeft, Vector2D& bottomRight ) const = 0;
@@ -82,8 +84,10 @@ public:
     virtual EditData editData();
     virtual void data( SerializationDescription& s ) const;
 
-    virtual bool establishVirtualStructure();
-    virtual void dumpVirtualStructure();
+    virtual bool establishStructure();
+    virtual bool dumpStructure();
+
+    bool hasStructure() const;
 };
 
 class Group : public Entity
@@ -92,7 +96,7 @@ public:
     Group();
     Group( std::wstring name, const Position& position = Position() );
 
-    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode mode ) override;
+    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point ) override;
 
     virtual bool draw( const Affine2D& transform, Overlap::Canvas& canvas ) const override;
     virtual bool size( const Affine2D& transform, Vector2D& topLeft, Vector2D& bottomRight ) const override;
@@ -110,7 +114,7 @@ public:
     Raster();
     Raster( std::wstring name, int64_t w, int64_t h, const Position& position = Position() );
 
-    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode mode ) override;
+    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point ) override;
 
     virtual bool draw( const Affine2D& transform, Overlap::Canvas& canvas ) const override;
     virtual bool size( const Affine2D& transform, Vector2D& topLeft, Vector2D& bottomRight ) const override;
@@ -131,7 +135,7 @@ public:
     Line();
     Line( std::wstring name, const Vector2D& start, const Vector2D& finish );
 
-    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode mode ) override;
+    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point ) override;
 
     virtual bool draw( const Affine2D& transform, Overlap::Canvas& canvas ) const override;
     virtual bool size( const Affine2D& transform, Vector2D& topLeft, Vector2D& bottomRight ) const override;
@@ -152,7 +156,7 @@ public:
     Rectangle();
     Rectangle( std::wstring name, double w, double h, const Position& position = Position() );
 
-    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode mode ) override;
+    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point ) override;
 
     virtual bool draw( const Affine2D& transform, Overlap::Canvas& canvas ) const override;
     virtual bool size( const Affine2D& transform, Vector2D& topLeft, Vector2D& bottomRight ) const override;
@@ -173,7 +177,7 @@ public:
     Circle();
     Circle( std::wstring name, const Vector2D& center, double radius );
 
-    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode mode ) override;
+    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point ) override;
 
     virtual bool draw( const Affine2D& transform, Overlap::Canvas& canvas ) const override;
     virtual bool size( const Affine2D& transform, Vector2D& topLeft, Vector2D& bottomRight ) const override;
@@ -190,12 +194,12 @@ class Text : public Entity
 {
 public:
     std::wstring text;
-    int w, h;
+    int64_t w, h;
 
     Text();
     Text( std::wstring name, std::wstring text, const Position& position = Position() );
 
-    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode mode ) override;
+    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point ) override;
 
     virtual bool draw( const Affine2D& transform, Overlap::Canvas& canvas ) const override;
     virtual bool size( const Affine2D& transform, Vector2D& topLeft, Vector2D& bottomRight ) const override;
@@ -216,7 +220,7 @@ public:
     Point();
     Point( std::wstring name, uint16_t spriteId = 0, const Vector2D& point = {} );
 
-    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode mode ) override;
+    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point ) override;
 
     virtual bool draw( const Affine2D& transform, Overlap::Canvas& canvas ) const override;
     virtual bool size( const Affine2D& transform, Vector2D& topLeft, Vector2D& bottomRight ) const override;
@@ -239,46 +243,67 @@ public:
 
     void setup();
 
-    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode mode ) override;
+    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point ) override;
 
     virtual bool draw( const Affine2D& transform, Overlap::Canvas& canvas ) const override;
     virtual bool size( const Affine2D& transform, Vector2D& topLeft, Vector2D& bottomRight ) const override;
 
     virtual std::wstring type() const override;
 
-    virtual bool establishVirtualStructure() override;
-    virtual void dumpVirtualStructure() override;
+    virtual bool establishStructure() override;
+    virtual bool dumpStructure() override;
+
+    virtual void data( SerializationDescription& s ) const override;
+};
+
+class Perspective : public Group
+{
+public:
+    Overlap::Frame frame0, frame1;
+
+    Perspective();
+    Perspective( std::wstring name, std::shared_ptr<Entity> target, const Position& position = Position() );
+
+    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point ) override;
+
+    virtual bool draw( const Affine2D& transform, Overlap::Canvas& canvas ) const override;
+    virtual bool size( const Affine2D& transform, Vector2D& topLeft, Vector2D& bottomRight ) const override;
+
+    virtual std::wstring type() const override;
+
+    virtual bool establishStructure() override;
+    virtual bool dumpStructure() override;
 };
 
 class Selection : public Group
 {
 private:
-    std::shared_ptr<Selection> unselection;
     std::vector<Entity*> targets;
 
-    Vector2D grabOrigin, angle, area;
-    JustEdit::Entity *marker;
-    Affine2D initialPosition;
+    Affine2D initialPositionGlobal, initialPositionLocal;
+    Entity *marker, *positionRoot;
     double initialRotation;
-    bool cramped;
+    Vector2D grabOrigin;
 public:
     Selection();
 
-    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point, SelectionMode mode ) override;
+    virtual Entity *pointsTo( const Affine2D& transform, const Vector2D& point ) override;
 
     virtual bool draw( const Affine2D& transform, Overlap::Canvas& canvas ) const override;
-
-    std::shared_ptr<Entity> extract();
 
     void select( Entity *target, bool add );
     Entity *getTarget();
     std::vector<Entity*> getTargets();
 
-    bool grab( const Vector2D& point );
-    bool move( const Vector2D& point );
+    void setRoot( Entity *root );
+
+    bool grab( const Affine2D& transform, const Vector2D& point );
+    bool move( const Affine2D& transform, const Vector2D& point );
     void release();
 
     void update();
+
+    bool isSelected() const;
 
     virtual std::wstring type() const override;
 };

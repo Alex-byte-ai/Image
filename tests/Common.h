@@ -39,7 +39,7 @@ public:
 Cores &getCores();
 ConsoleOutput *&getText();
 
-void ManualPicks( const ImageWindow::InputData &inputData, ImageWindow::OutputData &outputData );
+bool ManualPicks( const ImageWindow::InputData &inputData, ImageWindow::OutputData &outputData );
 
 bool LimitPalette( const ImageData &in, ImageData &out, double size );
 bool ReplacePinkWithTransparent( const ImageData &in, const ImageData &mask, ImageData &out );

@@ -19,6 +19,7 @@ public:
 
     bool operator==( Pixel other ) const;
     bool operator!=( Pixel other ) const;
+    bool operator<( Pixel other ) const;
 
     Pixel invert() const;
 
@@ -72,8 +73,8 @@ public:
     virtual bool input( const std::filesystem::path &fname ) = 0;
     virtual bool output( const std::filesystem::path &fname ) const = 0;
 
-    virtual bool input() = 0;
-    virtual bool output() const = 0;
+    virtual void input( bool *success = nullptr ) = 0;
+    virtual void output( bool *success = nullptr ) const = 0;
 
     virtual void line( int x0, int y0, int x1, int y1, const std::optional<Pixel> &contour = {} ) = 0;
     virtual void rectangle( int x0, int y0, int w, int h, const std::optional<Pixel> &contour = {}, const std::optional<Pixel> &fill = {} ) = 0;
@@ -89,6 +90,8 @@ public:
     virtual void function( ImageDataBase &out, const std::function<void( double, double, const Color &, Color & )> &f ) const = 0;
 
     virtual void placeTransperent( ImageDataBase &out, int x, int y ) const = 0;
+
+    virtual void fill( MatrixBase<bool>& mask, int j, int i ) const = 0;
 
     virtual ~ImageDataBase() {}
 };

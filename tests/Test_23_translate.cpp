@@ -227,41 +227,48 @@ void Test_23_Translate( Context &context )
         {
             wId = ( wId + scount - 1 ) % scount;
             redraw();
+            return true;
         }
 
         if( keyDown( 'D' ) )
         {
             wId = ( wId + 1 ) % scount;
             redraw();
+            return true;
         }
 
         if( keyDown( 'W' ) )
         {
             hId = ( hId + scount - 1 ) % scount;
             redraw();
+            return true;
         }
 
         if( keyDown( 'S' ) )
         {
             hId = ( hId + 1 ) % scount;
             redraw();
+            return true;
         }
 
         if( keyDown( 'E' ) )
         {
             sId = ( sId + 1 ) % samples.size();
             redraw();
+            return true;
         }
 
         if( keyDown( 'Q' ) )
         {
             sId = ( sId + samples.size() - 1 ) % samples.size();
             redraw();
+            return true;
         }
 
         if( keyDown( 'R' ) )
         {
             redraw();
+            return true;
         }
 
         if( sId == 0 && keyDown( 'C' ) )
@@ -273,71 +280,81 @@ void Test_23_Translate( Context &context )
                 redraw();
             }
             while( sId + 1 < samples.size() );
+            return true;
         }
 
         if( keyDown( 'B' ) )
         {
             scale = !scale;
             redraw();
+            return true;
         }
 
         if( inputVariableData && keyDown( 'L' ) )
         {
-            auto p = openPath();
-            if( p )
+            openPath( [&]( const auto & p )
             {
-                std::set<std::filesystem::path> folders;
-                /*
-                for( const auto &sample : samples )
-                    folders.insert( sample.path.parent_path() );
-                */
-                folders.insert( p->parent_path() );
-
-                std::set<std::filesystem::path> files;
-                for( const auto &path : folders )
+                if( p )
                 {
-                    for( const auto &file : std::filesystem::recursive_directory_iterator( path ) )
+                    std::set<std::filesystem::path> folders;
+                    /*
+                    for( const auto &sample : samples )
+                        folders.insert( sample.path.parent_path() );
+                    */
+                    folders.insert( p->parent_path() );
+
+                    std::set<std::filesystem::path> files;
+                    for( const auto &path : folders )
                     {
-                        std::filesystem::path f = file;
-                        if( f.extension() == L".bmp" || f.extension() == L".rle" || f.extension() == L".dib" || f.extension() == L".jpg" || f.extension() == L".jpeg" || f.extension() == L".png" )
-                            files.emplace( std::move( f ) );
+                        for( const auto &file : std::filesystem::recursive_directory_iterator( path ) )
+                        {
+                            std::filesystem::path f = file;
+                            if( f.extension() == L".bmp" || f.extension() == L".rle" || f.extension() == L".dib" || f.extension() == L".jpg" || f.extension() == L".jpeg" || f.extension() == L".png" )
+                                files.emplace( std::move( f ) );
+                        }
                     }
+
+                    erase();
+                    for( auto &file : files )
+                        get( file, false );
+                    sort();
+
+                    sId = 0;
+                    redraw();
                 }
-
-                erase();
-                for( auto &file : files )
-                    get( file, false );
-                sort();
-
-                sId = 0;
-                redraw();
-            }
+            } );
+            return true;
         }
 
         if( writeDisk && outputVariableData && keyDown( 'F' ) && *inputData.keys.letter( 'S' ) )
         {
-            auto path = savePath();
-            if( path )
+            savePath( [&]( const auto & p )
             {
-                ImageConvert::Reference data;
-                data.fill();
-
-                auto ext = path->extension().string();
-                std::transform( ext.begin(), ext.end(), ext.begin(), []( char c )
+                if( p )
                 {
-                    return std::toupper( c );
-                } );
-                data.format = ext;
+                    ImageConvert::Reference data;
+                    data.fill();
 
-                output.w = image.w();
-                output.h = image.h();
+                    auto ext = p->extension().string();
+                    std::transform( ext.begin(), ext.end(), ext.begin(), []( char c )
+                    {
+                        return std::toupper( c );
+                    } );
+                    data.format = ext;
 
-                translate( output, data, false );
+                    output.w = image.w();
+                    output.h = image.h();
 
-                std::ofstream file( *path, std::ios::binary );
-                makeException( file.write( ( char * )data.link, data.bytes ) );
-            }
+                    translate( output, data, false );
+
+                    std::ofstream file( *p, std::ios::binary );
+                    makeException( file.write( ( char * )data.link, data.bytes ) );
+                }
+            } );
+            return true;
         }
+
+        return false;
     };
 
     if( showImages )

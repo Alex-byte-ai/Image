@@ -12,7 +12,7 @@
 
 static ConsoleOutput *globalText = nullptr;
 
-static void MouseDrawing( const ImageWindow::InputData &inputData, ImageWindow::OutputData &outputData )
+static bool MouseDrawing( const ImageWindow::InputData &inputData, ImageWindow::OutputData &outputData )
 {
     if( inputData.mouseX.changed() || inputData.mouseY.changed() )
     {
@@ -24,16 +24,21 @@ static void MouseDrawing( const ImageWindow::InputData &inputData, ImageWindow::
                 *( outputData.image.get() )( x, y ) = Pixel( *inputData.leftMouse * 255, *inputData.middleMouse * 255, *inputData.rightMouse * 255 );
             }
         }
+
+        return true;
     }
 
     auto &key = inputData.keys.letter( 'R' );
     if( key.changed() && *key )
     {
         outputData.image.get().reset( 512, 512, Pixel( 128, 128, 128 ) );
+        return true;
     }
+
+    return false;
 }
 
-static void DrawTextOnBackground( const ImageWindow::InputData &inputData, ImageWindow::OutputData &outputData )
+static bool DrawTextOnBackground( const ImageWindow::InputData &inputData, ImageWindow::OutputData &outputData )
 {
     static ImageData backgroundImage, cursorPositionMarker;
     static bool textBackground;
@@ -70,6 +75,8 @@ static void DrawTextOnBackground( const ImageWindow::InputData &inputData, Image
                 text.set( L"background.blue", L"5" );
             }
             outputData.image.get().text( text );
+
+            return true;
         }
     }
 
@@ -93,15 +100,20 @@ static void DrawTextOnBackground( const ImageWindow::InputData &inputData, Image
         default:
             makeException( false );
         }
+
+        return true;
     }
 
     if( inputData.rightMouse.changed() && *inputData.rightMouse )
     {
         textBackground = !textBackground;
+        return true;
     }
+
+    return false;
 }
 
-static void DrawTransformedImage( const ImageWindow::InputData &inputData, ImageWindow::OutputData &outputData )
+static bool DrawTransformedImage( const ImageWindow::InputData &inputData, ImageWindow::OutputData &outputData )
 {
     static std::unique_ptr<Overlap::Picture> picture;
     static std::unique_ptr<Overlap::Canvas> canvas;
@@ -146,6 +158,7 @@ static void DrawTransformedImage( const ImageWindow::InputData &inputData, Image
         shift.x = *inputData.mouseX;
         shift.y = *inputData.mouseY;
         draw();
+        return true;
     }
 
     if( inputData.leftMouse.changed() && *inputData.leftMouse )
@@ -163,6 +176,7 @@ static void DrawTransformedImage( const ImageWindow::InputData &inputData, Image
         }
 
         draw();
+        return true;
     }
 
     if( inputData.rightMouse.changed() && *inputData.rightMouse )
@@ -181,6 +195,8 @@ static void DrawTransformedImage( const ImageWindow::InputData &inputData, Image
         {
             *globalText << L"Vertical scale\n";
         }
+
+        return true;
     }
 
     auto &a = inputData.keys.letter( 'A' );
@@ -200,6 +216,7 @@ static void DrawTransformedImage( const ImageWindow::InputData &inputData, Image
         }
 
         draw();
+        return true;
     }
 
     auto &d = inputData.keys.letter( 'D' );
@@ -219,7 +236,10 @@ static void DrawTransformedImage( const ImageWindow::InputData &inputData, Image
         }
 
         draw();
+        return true;
     }
+
+    return false;
 }
 
 void Test_05_interactive_window( Context &context )

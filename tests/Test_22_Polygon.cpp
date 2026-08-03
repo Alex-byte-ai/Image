@@ -314,6 +314,7 @@ static void experiment0( ConsoleOutput &text, Context &, bool, bool showImages )
                 points.clear();
             }
             update();
+            return true;
         }
 
         auto &rightMouse = inputData.rightMouse;
@@ -321,7 +322,10 @@ static void experiment0( ConsoleOutput &text, Context &, bool, bool showImages )
         {
             id = ( id + 1 ) % 3;
             update();
+            return true;
         }
+
+        return false;
     };
 
     if( showImages )

@@ -18,7 +18,11 @@ void Test_X0( Context &context )
 
     text << L"Open input\\in.png\n";
 
-    auto p = openPath();
+    std::optional<std::filesystem::path> p;
+    openPath( [&p]( const auto & path )
+    {
+        p = path;
+    } );
     if( !p.has_value() )
         return;
 

@@ -83,7 +83,9 @@ void Test_00_save_and_load( Context &context )
     if( inputVariableData )
     {
         text << L"Open input\\load_this.png\n";
-        if( in.input() )
+        bool success = false;
+        in.input( &success );
+        if( success )
         {
             if( showImages )
             {

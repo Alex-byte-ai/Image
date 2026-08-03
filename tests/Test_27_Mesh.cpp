@@ -58,7 +58,7 @@ void Test_27_Mesh( Context &context )
         Vector3D zero = Vector3D( 0.75, 0.75, 0 );
         double sigma = 0.2;
 
-        field.transform( [&]( Vector3D & point )
+        field.setPoints( [&]( Vector3D & point )
         {
             point.z = 0.3 * Exp( -0.5 * ( point - zero ).Sqr() / ( sigma * sigma ) );
         } );
@@ -115,7 +115,7 @@ void Test_27_Mesh( Context &context )
                 auto normal = triangle.n( u, v );
                 double k = -intensity * ( dp * normal ) / ( p - light ).Sqr();
 
-                auto uv = triangle.uv( u, v );
+                auto uv = triangle.t( u, v );
                 u = uv.x;
                 v = uv.y;
 
@@ -155,31 +155,38 @@ void Test_27_Mesh( Context &context )
             angleX = 0;
             angleY = 0;
             draw( outputData.image.get() );
+            return true;
         }
 
         if( keyDown( 'W' ) )
         {
             angleX -= Pi() / 8;
             draw( outputData.image.get() );
+            return true;
         }
 
         if( keyDown( 'A' ) )
         {
             angleY += Pi() / 8;
             draw( outputData.image.get() );
+            return true;
         }
 
         if( keyDown( 'S' ) )
         {
             angleX += Pi() / 8;
             draw( outputData.image.get() );
+            return true;
         }
 
         if( keyDown( 'D' ) )
         {
             angleY -= Pi() / 8;
             draw( outputData.image.get() );
+            return true;
         }
+
+        return false;
     };
 
     mesh = original = cube;

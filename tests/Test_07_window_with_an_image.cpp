@@ -35,7 +35,10 @@ void Test_07_window_with_an_image( Context &context )
                     if( keyDown( 'A' ) )
                     {
                         window.run();
+                        return true;
                     }
+
+                    return false;
                 };
 
                 ImageWindow host( h, manage );

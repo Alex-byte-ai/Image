@@ -42,8 +42,8 @@
 					<Add option="-fno-sanitize-recover=undefined" />
 					<Add option="-fsanitize-undefined-trap-on-error" />
 					<Add option="-ggdb" />
-					<Add option="-DWINVER=0x410" />
-					<Add option="-D_WIN32_WINNT=0x0501" />
+					<Add option="-DWINVER=0x601" />
+					<Add option="-D_WIN32_WINNT=0x601" />
 					<Add option="-DMEMORY_MANAGEMENT=1" />
 					<Add option="-D_UNICODE" />
 					<Add option="-DUNICODE" />
@@ -66,8 +66,8 @@
 					<Add option="-Wl,-Map=Debug\bin\main.map" />
 					<Add library="Msimg32" />
 					<Add library="comdlg32" />
-					<Add library="comctl32" />
 					<Add library="shlwapi" />
+					<Add library="dwmapi" />
 					<Add library="gdi32" />
 					<Add library="zlibstatic" />
 					<Add directory="../Zlib-1.3.1" />
@@ -107,8 +107,8 @@
 					<Add option="-ftemplate-backtrace-limit=0" />
 					<Add option="-finput-charset=UTF-8" />
 					<Add option="-fexec-charset=UTF-8" />
-					<Add option="-DWINVER=0x410" />
-					<Add option="-D_WIN32_WINNT=0x0501" />
+					<Add option="-DWINVER=0x601" />
+					<Add option="-D_WIN32_WINNT=0x601" />
 					<Add option="-DMEMORY_MANAGEMENT=1" />
 					<Add option="-D_UNICODE" />
 					<Add option="-DUNICODE" />
@@ -128,8 +128,8 @@
 					<Add option="-fexceptions" />
 					<Add library="Msimg32" />
 					<Add library="comdlg32" />
-					<Add library="comctl32" />
 					<Add library="shlwapi" />
+					<Add library="dwmapi" />
 					<Add library="gdi32" />
 					<Add library="zlibstatic" />
 					<Add directory="../Zlib-1.3.1" />
@@ -173,12 +173,14 @@
 		<Unit filename="../Utilities/Console.h" />
 		<Unit filename="../Utilities/Context.cpp" />
 		<Unit filename="../Utilities/Context.h" />
+		<Unit filename="../Utilities/Curve.cpp" />
+		<Unit filename="../Utilities/Curve.h" />
+		<Unit filename="../Utilities/Ellipse.cpp" />
+		<Unit filename="../Utilities/Ellipse.h" />
 		<Unit filename="../Utilities/EntityCounter.cpp" />
 		<Unit filename="../Utilities/EntityCounter.h" />
 		<Unit filename="../Utilities/Exception.cpp" />
 		<Unit filename="../Utilities/Exception.h" />
-		<Unit filename="../Utilities/GetPathToFile.cpp" />
-		<Unit filename="../Utilities/GetPathToFile.h" />
 		<Unit filename="../Utilities/Image/ANYF.cpp" />
 		<Unit filename="../Utilities/Image/ANYF.h" />
 		<Unit filename="../Utilities/Image/BMP.cpp" />
@@ -203,6 +205,8 @@
 		<Unit filename="../Utilities/Lambda.h" />
 		<Unit filename="../Utilities/Library.cpp" />
 		<Unit filename="../Utilities/Library.h" />
+		<Unit filename="../Utilities/Line.cpp" />
+		<Unit filename="../Utilities/Line.h" />
 		<Unit filename="../Utilities/Matrix.cpp" />
 		<Unit filename="../Utilities/Matrix.h" />
 		<Unit filename="../Utilities/Matrix2D.cpp" />
@@ -245,10 +249,6 @@
 		<Unit filename="CheckProgress.h" />
 		<Unit filename="CompositeObject.cpp" />
 		<Unit filename="CompositeObject.h" />
-		<Unit filename="Curve.cpp" />
-		<Unit filename="Curve.h" />
-		<Unit filename="Ellipse.cpp" />
-		<Unit filename="Ellipse.h" />
 		<Unit filename="Filters.cpp" />
 		<Unit filename="Filters.h" />
 		<Unit filename="GetImage.cpp" />
@@ -261,8 +261,6 @@
 		<Unit filename="ImageWindow.h" />
 		<Unit filename="JustEdit.cpp" />
 		<Unit filename="JustEdit.h" />
-		<Unit filename="Line.cpp" />
-		<Unit filename="Line.h" />
 		<Unit filename="Outline.cpp" />
 		<Unit filename="Outline.h" />
 		<Unit filename="Overlap.cpp" />
@@ -346,6 +344,10 @@
 		<Unit filename="tests/Test_31_Procedural_textures.h" />
 		<Unit filename="tests/Test_32_JustEdit.cpp" />
 		<Unit filename="tests/Test_32_JustEdit.h" />
+		<Unit filename="tests/Test_33_Count_colors.cpp" />
+		<Unit filename="tests/Test_33_Count_colors.h" />
+		<Unit filename="tests/Test_34_Digits.cpp" />
+		<Unit filename="tests/Test_34_Digits.h" />
 		<Unit filename="tests/Test_X0.cpp" />
 		<Unit filename="tests/Test_X0.h" />
 		<Unit filename="tests/Test_X1.cpp" />

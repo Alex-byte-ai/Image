@@ -8,7 +8,7 @@ How to assemble and run for Windows:
 1. Download MinGW from
 https://github.com/brechtsanders/winlibs_mingw/releases/download/14.2.0posix-19.1.1-12.0.0-ucrt-r2/winlibs-x86_64-posix-seh-gcc-14.2.0-llvm-19.1.1-mingw-w64ucrt-12.0.0-r2.7z
 1. Unzip, rename folder to MinGW, move it to C:\\
-	* Press Win + S and search for "Environment Variables."
+	* Press Win + R, type sysdm.cpl, press Enter
 	* Select Edit the system environment variables.
 	* In the System Properties window, click Environment Variables....
 	* Locate the PATH variable under System Variables, and click Edit.
