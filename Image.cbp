@@ -348,6 +348,8 @@
 		<Unit filename="tests/Test_33_Count_colors.h" />
 		<Unit filename="tests/Test_34_Digits.cpp" />
 		<Unit filename="tests/Test_34_Digits.h" />
+		<Unit filename="tests/Test_35_Image.cpp" />
+		<Unit filename="tests/Test_35_Image.h" />
 		<Unit filename="tests/Test_X0.cpp" />
 		<Unit filename="tests/Test_X0.h" />
 		<Unit filename="tests/Test_X1.cpp" />
