@@ -56,33 +56,33 @@ int main()
         pause.prepare = [&console]( Pause::InputType category, const std::optional<std::wstring> &message )
         {
             if( category & Pause::InputType::clibpoardHasValue )
-                console( L"Copy something.\n" );
+                console.msg( L"Copy something.\n" );
             if( category & Pause::InputType::windowFocused )
-                console( L"Select console window.\n" );
+                console.msg( L"Select console window.\n" );
 
             switch( *category )
             {
             case Pause::InputType::any:
-                console( L"Press ⌨ any key to continue...\n" );
+                console.msg( L"Press ⌨ any key to continue...\n" );
                 break;
             case Pause::InputType::enter:
-                console( L"Press ↩ 'Enter' to continue...\n" );
+                console.msg( L"Press ↩ 'Enter' to continue...\n" );
                 break;
             case Pause::InputType::shift:
-                console( L"Press ⇧ 'Shift' to continue...\n" );
+                console.msg( L"Press ⇧ 'Shift' to continue...\n" );
                 break;
             case Pause::InputType::esc:
-                console( L"Press ⎋ 'Escape' to continue...\n" );
+                console.msg( L"Press ⎋ 'Escape' to continue...\n" );
                 break;
             case Pause::InputType::prtSc:
-                console( L"Press 🖼 'Print screen' to continue...\n" );
+                console.msg( L"Press 🖼 'Print screen' to continue...\n" );
                 break;
             default:
                 makeException( false );
             }
 
             if( message )
-                console( *message + L"\n" );
+                console.msg( *message + L"\n" );
 
             return true;
         };
@@ -130,9 +130,8 @@ int main()
         // info( L"whitelist" )[0] = L"Test 28 Tree";
         // info( L"whitelist" )[0] = L"Test 30 Flower";
         // info( L"whitelist" )[0] = L"Test 31 Procedural textures";
-        // info( L"whitelist" )[0] = L"Test 32 JustEdit";
+        info( L"whitelist" )[0] = L"Test 32 JustEdit";
         // info( L"whitelist" )[0] = L"Test 33 Count colors";
-        info( L"whitelist" )[0] = L"Test 35 Image";
 
         Tests tests( console, pause, info );
 

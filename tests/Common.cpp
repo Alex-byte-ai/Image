@@ -4,14 +4,14 @@
 #include "../CheckProgress.h"
 
 static Cores cores;
-static ConsoleOutput *globalText = nullptr;
+static Console *globalText = nullptr;
 
 Cores &getCores()
 {
     return cores;
 }
 
-ConsoleOutput *&getText()
+Console *&getText()
 {
     return globalText;
 }

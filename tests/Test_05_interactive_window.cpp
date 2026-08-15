@@ -10,7 +10,7 @@
 #include "../Filters.h"
 #include "../Overlap.h"
 
-static ConsoleOutput *globalText = nullptr;
+static Console *globalText = nullptr;
 
 static bool MouseDrawing( const ImageWindow::InputData &inputData, ImageWindow::OutputData &outputData )
 {

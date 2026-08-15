@@ -37,7 +37,7 @@ public:
 };
 
 Cores &getCores();
-ConsoleOutput *&getText();
+Console *&getText();
 
 bool ManualPicks( const ImageWindow::InputData &inputData, ImageWindow::OutputData &outputData );
 

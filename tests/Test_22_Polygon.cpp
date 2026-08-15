@@ -73,7 +73,7 @@ static void prepareQ( Quadrangle &polygon, Quadrangle &otherPolygon, Quadrangle 
         otherPolygon.flip();
 };
 
-static void demonstrate( ConsoleOutput &text, Context &context, bool writeDisk, bool showImages )
+static void demonstrate( Console &text, Context &context, bool writeDisk, bool showImages )
 {
     std::array<bool, 2> options{false, true};
     Color red( 1, 0, 0 ), green( 0, 1, 0 ), blue( 0, 0, 1 ),
@@ -140,7 +140,7 @@ static void demonstrate( ConsoleOutput &text, Context &context, bool writeDisk, 
         image.output( context.Output() / L"convex_polygon.png" );
 }
 
-static void demonstrateQ( ConsoleOutput &text, Context &context, bool writeDisk, bool showImages )
+static void demonstrateQ( Console &text, Context &context, bool writeDisk, bool showImages )
 {
     std::array<bool, 2> options{false, true};
     Color red( 1, 0, 0 ), green( 0, 1, 0 ), blue( 0, 0, 1 ),
@@ -201,7 +201,7 @@ static void demonstrateQ( ConsoleOutput &text, Context &context, bool writeDisk,
         image.output( context.Output() / L"quadrangle.png" );
 }
 
-static void demonstrateNull( ConsoleOutput &text, Context &, bool, bool showImages )
+static void demonstrateNull( Console &text, Context &, bool, bool showImages )
 {
     std::array<bool, 2> options{false, true};
     Color red( 1, 0, 0 ), green( 0, 1, 0 ), blue( 0, 0, 1 ),
@@ -251,7 +251,7 @@ static void demonstrateNull( ConsoleOutput &text, Context &, bool, bool showImag
     }
 }
 
-static void experiment0( ConsoleOutput &text, Context &, bool, bool showImages )
+static void experiment0( Console &text, Context &, bool, bool showImages )
 {
     Color red( 1, 0, 0 ), green( 0, 1, 0 ), blue( 0, 0, 1 ),
           cyan( 0, 1, 1 ), magenta( 1, 0, 1 ), yellow( 1, 1, 0 ),
@@ -335,7 +335,7 @@ static void experiment0( ConsoleOutput &text, Context &, bool, bool showImages )
     }
 }
 
-static void experiment1( ConsoleOutput &text, Context &, bool, bool showImages )
+static void experiment1( Console &text, Context &, bool, bool showImages )
 {
     double ang = 0, xs = 1, ys = 1;
     ImageData background, spot;

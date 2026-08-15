@@ -5,7 +5,7 @@
 #include "../ImageData.h"
 #include "../Palette.h"
 
-static ConsoleOutput *globalText = nullptr;
+static Console *globalText = nullptr;
 
 static void drawCross( ImageData &image, int x, int y, int size )
 {

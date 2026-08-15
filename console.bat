@@ -1,2 +1,2 @@
-start "" /D "." "../Console/Release/bin/Console.exe" "configure(\"../Console/config.cfg\");"
+start "" /D "." "../Console/Release/bin/Console.exe" "configure(\"../Console/config.ini\");"
 exit

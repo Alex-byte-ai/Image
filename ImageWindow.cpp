@@ -64,6 +64,7 @@ ImageWindow::ImageWindow( ImageDataBase &idb, HandleMsg hnd, std::shared_ptr<Jus
     desc.y = f.y;
     desc.self.w = f.w;
     desc.self.h = f.h;
+    desc.client.color = GraphicInterface::makeColor( 60, 70, 200, 255 );
 
     desc.content.w = image.w();
     desc.content.h = image.h();
@@ -865,8 +866,8 @@ void ImageWindow::prepareIcon( GraphicInterface::Window& desc )
     if( iconData )
     {
         auto& ico = *iconData;
-        desc.icon.bufferW = desc.icon.w = ico.w;
-        desc.icon.bufferH = desc.icon.h = ico.h;
+        desc.icon.w = ico.w;
+        desc.icon.h = ico.h;
         desc.icon.pixels = ico.image;
         return;
     }
@@ -931,8 +932,8 @@ void ImageWindow::prepareIcon( GraphicInterface::Window& desc )
         desc.icon.prepare( icon( 0, 0 ), icon.s(), icon.h() );
 
         auto& ico = iconData.emplace();
-        ico.w = desc.icon.bufferW;
-        ico.h = desc.icon.bufferH;
+        ico.w = desc.icon.w;
+        ico.h = desc.icon.h;
         ico.image = desc.icon.pixels;
     }
 }

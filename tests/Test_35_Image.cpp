@@ -4,7 +4,6 @@
 
 void Test_35_Image( Context &context )
 {
-    auto &text = context.output();
     auto s = context.scope( __FUNCTION__ );
 
     auto &info = context.information;

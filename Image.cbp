@@ -181,6 +181,8 @@
 		<Unit filename="../Utilities/EntityCounter.h" />
 		<Unit filename="../Utilities/Exception.cpp" />
 		<Unit filename="../Utilities/Exception.h" />
+		<Unit filename="../Utilities/GetTime.cpp" />
+		<Unit filename="../Utilities/GetTime.h" />
 		<Unit filename="../Utilities/Image/ANYF.cpp" />
 		<Unit filename="../Utilities/Image/ANYF.h" />
 		<Unit filename="../Utilities/Image/BMP.cpp" />
@@ -241,6 +243,10 @@
 		<Unit filename="../Utilities/Vector3D.h" />
 		<Unit filename="../Utilities/Window.cpp" />
 		<Unit filename="../Utilities/Window.h" />
+		<Unit filename="../Utilities/resource.h" />
+		<Unit filename="../Utilities/resource.rc">
+			<Option compilerVar="WINDRES" />
+		</Unit>
 		<Unit filename="ApplyKernel.cpp" />
 		<Unit filename="ApplyKernel.h" />
 		<Unit filename="BitmapTools.cpp" />
@@ -274,10 +280,6 @@
 		<Unit filename="Text.cpp" />
 		<Unit filename="Text.h" />
 		<Unit filename="main.cpp" />
-		<Unit filename="resource.h" />
-		<Unit filename="resource.rc">
-			<Option compilerVar="WINDRES" />
-		</Unit>
 		<Unit filename="tests/Common.cpp" />
 		<Unit filename="tests/Common.h" />
 		<Unit filename="tests/Test_00_save_and_load.cpp" />
